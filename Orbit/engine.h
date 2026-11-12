@@ -13,7 +13,8 @@ constexpr int TrackCount = 4;
 constexpr int MaxNotes = 96;
 constexpr int TicksPerStep = 24;
 constexpr int LoopTicks = 32 * TicksPerStep;
-constexpr int DemoCount = 12;
+constexpr int DemoCount = 13;
+constexpr int SixSevenArrangement = 12;
 constexpr int SceneCount = 4;
 constexpr int FxSteps = 64;
 extern const char *const SceneNames[SceneCount];
@@ -164,6 +165,7 @@ public:
     void clearSelected();
     void undo();
     Result loadDemo(int demo = 0);
+    Result restoreSong(const Session &song, const int16_t *recording);
     Result startCapture();
     Result audition();
     void capture(const int16_t *frames, size_t count, int stride, int channel);

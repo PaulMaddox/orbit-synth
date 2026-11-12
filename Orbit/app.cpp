@@ -11,6 +11,8 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <memory>
+#include <new>
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "FreeSansBold10pt7b.h"
@@ -20,6 +22,7 @@
 #include "screen_idle.h"
 #include "ui_layout.h"
 #include "touch_gesture.h"
+#include "song_storage.h"
 
 using namespace orbit;
 namespace {
@@ -33,15 +36,15 @@ constexpr uint16_t WHITE = 0xef7d, DIM = 0x8493, CYAN = 0x4f19;
 constexpr uint16_t CORAL = 0xfbaf, AMBER = 0xfdec, PURPLE = 0xbb9f;
 const uint16_t accents[] = {CYAN, AMBER, PURPLE, CORAL};
 const uint16_t demoAccents[DemoCount] = {
-    CORAL, AMBER, PURPLE, CYAN, CORAL, CYAN, AMBER, CYAN, AMBER, CORAL, PURPLE, CYAN
+    CYAN, CORAL, AMBER, PURPLE, CYAN, CORAL, CYAN, AMBER, CYAN, AMBER, CORAL, PURPLE, CYAN
 };
 const char *trackNames[] = {"MELODY", "BASS", "BEATS", "VOICE"};
 const char *drumNames[] = {"KICK", "SNARE", "HAT", "OPEN", "CLAP", "TOM", "SHAKE", "RIM"};
 const char *noteNames[] = {"C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 const char *scaleNames[] = {"DREAMY", "BRIGHT", "MOODY"};
 enum Page { Play, Mixer, Sound, Mic, Settings, Confirm, Demos, SoundPicker,
-            Menu, Scenes, Slices, LiveFx, SceneCopy, FxOptions };
-enum Confirmation { ClearTrack, Demo, RecordTrack, CopySection, ReplaceMoves };
+            Menu, Scenes, Slices, LiveFx, SceneCopy, FxOptions, Songs, SongOptions };
+enum Confirmation { ClearTrack, Demo, RecordTrack, CopySection, ReplaceMoves, SaveSong, LoadSong };
 Page page = Play, returnPage = Mixer;
 Page menuReturn = Play;
 Confirmation confirmation = ClearTrack;
@@ -57,6 +60,8 @@ int pendingDemo = 0;
 int pendingSound = 0, soundFamily = 0, pickerTrack = 0;
 int demoPage = 0;
 int pendingScene = 0;
+int songPage = 0, pendingSong = 0;
+bool songUsed[SongSlots]{};
 uint32_t fullDraws = 0, mixerMoves = 0;
 std::atomic<uint32_t> audioMaxUs{0}, audioErrors{0}, renderedBlocks{0};
 std::atomic<uint32_t> captureDrops{0};
@@ -532,8 +537,45 @@ void drawSettings(const Status &s) {
     char mood[24];
     snprintf(mood, sizeof(mood), "MOOD: %s", scaleNames[s.scale]);
     button(8, 202, 224, 29, mood, CYAN);
-    button(ui::FooterPair[0], "DEMOS", AMBER);
-    button(ui::FooterPair[1], "BACK");
+    button(ui::Footer[0], "DEMOS", AMBER);
+    button(ui::Footer[1], "SONGS", CYAN);
+    button(ui::Footer[2], "BACK");
+}
+
+void openSongs();
+void saveSongSlot();
+void loadSongSlot();
+
+void drawSongs(const Status &s) {
+    header("SONGS", s, true);
+    for (int card = 0; card < 4; ++card) {
+        int slot = songPage * 4 + card;
+        const auto &r = ui::SongCards[card];
+        button(r, "", songUsed[slot] ? CYAN : BORDER);
+        char name[16];
+        snprintf(name, sizeof(name), "SONG %d", slot + 1);
+        center(r.x, r.y + 13, r.w, name, WHITE, 2);
+        center(r.x, r.y + 43, r.w, songUsed[slot] ? "SAVED" : "EMPTY", DIM);
+    }
+    center(8, 201, 224, "ALL SCENES + YOUR VOICE SOUND", DIM);
+    char pages[24];
+    snprintf(pages, sizeof(pages), "SONGS %d-%d OF %d", songPage * 4 + 1, songPage * 4 + 4, SongSlots);
+    center(8, 222, 224, pages, DIM);
+    button(ui::Footer[0], "<");
+    button(ui::Footer[1], "BACK");
+    button(ui::Footer[2], ">");
+}
+
+void drawSongOptions(const Status &s) {
+    char title[16];
+    snprintf(title, sizeof(title), "SONG %d", pendingSong + 1);
+    header(title, s, true);
+    button(ui::SongSave, songUsed[pendingSong] ? "REPLACE WITH CURRENT SONG" : "SAVE CURRENT SONG", CYAN);
+    button(ui::SongLoad, songUsed[pendingSong] ? "LOAD THIS SONG" : "EMPTY - SAVE HERE FIRST",
+        songUsed[pendingSong] ? AMBER : BORDER);
+    center(8, 199, 224, "STOP MUSIC BEFORE SAVING / LOADING", DIM);
+    center(8, 219, 224, "OTHER SAVED SONGS ARE KEPT", DIM);
+    button(ui::FooterWide, "BACK TO SONGS");
 }
 
 void drawDemos(const Status &s) {
@@ -760,6 +802,19 @@ void drawConfirm(const Status &s) {
         return;
     }
     header("CONFIRM", s);
+    if (confirmation == SaveSong || confirmation == LoadSong) {
+        heading(18, 83, confirmation == SaveSong ? "Replace song?" : "Load song?");
+        char name[16];
+        snprintf(name, sizeof(name), "SONG %d", pendingSong + 1);
+        center(8, 112, 224, name, AMBER);
+        center(8, 139, 224, confirmation == SaveSong ?
+            "REPLACES THIS SAVED SONG" : "REPLACES YOUR CURRENT MUSIC", DIM);
+        center(8, 161, 224, "INCLUDES ALL SCENES + VOICE SOUND", DIM);
+        center(8, 184, 224, "THIS CANNOT BE UNDONE", CORAL);
+        button(ui::FooterPair[0], "CANCEL");
+        button(ui::FooterPair[1], confirmation == SaveSong ? "REPLACE" : "LOAD", CORAL);
+        return;
+    }
     if (confirmation == CopySection || confirmation == ReplaceMoves) {
         heading(18, 83, confirmation == CopySection ? "Copy section?" : "New moves?");
         center(8, 112, 224, confirmation == CopySection ?
@@ -797,10 +852,13 @@ void draw(const Status &s) {
     case Slices: drawSlices(s); break;
     case LiveFx: drawLiveFx(s); break;
     case FxOptions: drawFxOptions(s); break;
+    case Songs: drawSongs(s); break;
+    case SongOptions: drawSongOptions(s); break;
     }
     if (page != Play && int32_t(toastUntil - millis()) > 0) {
         int y = page == Mixer || page == Demos ? 225 : page == Settings ? 112 :
-            page == Confirm ? 181 : page == Mic ? 220 : 224;
+            page == Confirm ? (confirmation == SaveSong || confirmation == LoadSong ? 211 : 181) :
+            page == Mic ? 220 : 224;
         gfx->fillRect(8, y, 224, 10, BG);
         center(8, y + 1, 224, toastText, AMBER);
     }
@@ -890,6 +948,14 @@ void handleTap(int x, int y) {
     int footer = ui::hit(ui::FooterTouch, x, y);
     int pair = ui::hit(ui::FooterPairTouch, x, y);
     if (page == Confirm) {
+        if (confirmation == SaveSong || confirmation == LoadSong) {
+            if (pair == 0) switchPage(SongOptions);
+            else if (pair == 1) {
+                if (confirmation == SaveSong) saveSongSlot();
+                else loadSongSlot();
+            }
+            return;
+        }
         if (confirmation == CopySection || confirmation == ReplaceMoves) {
             if (pair == 0) switchPage(returnPage);
             else if (pair == 1) {
@@ -936,6 +1002,32 @@ void handleTap(int x, int y) {
             int card = ui::hit(ui::MenuCards, x, y);
             const Page targets[] = {Play, Mixer, Scenes, Slices, LiveFx, Settings};
             if (card >= 0) openPerformance(targets[card]);
+        }
+        return;
+    }
+    if (page == Songs) {
+        int card = ui::hit(ui::SongCards, x, y);
+        if (ui::BackTouch.contains(x, y) || footer == 1) switchPage(Settings);
+        else if (card >= 0) {
+            pendingSong = songPage * 4 + card;
+            switchPage(SongOptions);
+        } else if (footer == 0 || footer == 2) {
+            songPage = 1 - songPage;
+            dirty = true;
+        }
+        return;
+    }
+    if (page == SongOptions) {
+        if (ui::BackTouch.contains(x, y) || ui::FooterWideTouch.contains(x, y)) openSongs();
+        else if (ui::SongSave.contains(x, y)) {
+            if (songUsed[pendingSong]) {
+                confirmation = SaveSong;
+                switchPage(Confirm);
+            } else saveSongSlot();
+        } else if (ui::SongLoad.contains(x, y)) {
+            if (!songUsed[pendingSong]) { toast("EMPTY - SAVE A SONG HERE FIRST"); return; }
+            confirmation = LoadSong;
+            switchPage(Confirm);
         }
         return;
     }
@@ -1107,10 +1199,11 @@ void handleTap(int x, int y) {
             Lock lock; engine.setRoot((s.root + 1) % 12); dirty = true;
         } else if (y >= 202 && y <= 231) {
             Lock lock; engine.setScale((s.scale + 1) % 3); dirty = true;
-        } else if (pair >= 0) {
-            if (pair == 0) {
+        } else if (footer >= 0) {
+            if (footer == 0) {
                 openDemoPicker();
-            } else switchPage(Play);
+            } else if (footer == 1) openSongs();
+            else switchPage(Play);
         }
     }
 }
@@ -1360,89 +1453,101 @@ bool enterSleep() {
 }
 
 uint32_t checksum(const uint8_t *data, size_t size, uint32_t hash = 2166136261u) {
-    for (size_t i = 0; i < size; ++i) { hash ^= data[i]; hash *= 16777619u; }
-    return hash;
+    return songChecksum(data, size, hash);
 }
 
-bool loadSession() {
-    if (!LittleFS.exists("/orbit.bin")) return false;
-    File file = LittleFS.open("/orbit.bin", "r");
+bool loadSession(const char *path = "/orbit.bin") {
+    File file = LittleFS.open(path, "r");
     static Session loaded;
-    uint32_t storedHash = 0;
-    constexpr size_t headerBytes = offsetof(Session, tracks);
-    if (!file || file.read(reinterpret_cast<uint8_t *>(&loaded), headerBytes) != headerBytes ||
-        (loaded.version < 1 || loaded.version > 5) || loaded.sampleCount > SampleCapacity) {
-        Serial.println("SAVE_ERROR invalid session");
-        toast("SAVE INVALID - DEMO LOADED", 4000);
+    std::unique_ptr<int16_t[]> sample(new (std::nothrow) int16_t[SampleCapacity]);
+    if (!sample) {
+        Serial.printf("LOAD_ERROR staging allocation path=%s\n", path);
+        toast("NOT ENOUGH MEMORY - TRY RESTART", 4000);
         return false;
     }
-    uint16_t storedVersion = loaded.version;
-    bool legacy = storedVersion == 1;
-    size_t trackBytes = legacy ? offsetof(Track, pitch) : sizeof(Track);
-    size_t extensionBytes = storedVersion >= 3 ? sizeof(Session) - LegacySessionBytes : 0;
-    if (file.size() != headerBytes + TrackCount * trackBytes + extensionBytes +
-        loaded.sampleCount * 2 + sizeof(storedHash)) {
-        Serial.println("SAVE_ERROR invalid session size");
-        toast("SAVE INVALID - DEMO LOADED", 4000);
+    if (!readSong(file, loaded, sample.get())) {
+        Serial.printf("LOAD_ERROR missing, invalid or unreadable song path=%s\n", path);
+        toast("LOAD FAILED - SONG UNCHANGED", 4000);
         return false;
     }
-    uint32_t hash = checksum(reinterpret_cast<const uint8_t *>(&loaded), headerBytes);
-    for (Track &track : loaded.tracks) {
-        if (file.read(reinterpret_cast<uint8_t *>(&track), trackBytes) != trackBytes) {
-            Serial.println("SAVE_ERROR short track read"); return false;
-        }
-        hash = checksum(reinterpret_cast<const uint8_t *>(&track), trackBytes, hash);
-    }
-    if (extensionBytes) {
-        auto *extension = reinterpret_cast<uint8_t *>(&loaded) + LegacySessionBytes;
-        if (file.read(extension, extensionBytes) != extensionBytes) {
-            Serial.println("SAVE_ERROR short performance read"); return false;
-        }
-        hash = checksum(extension, extensionBytes, hash);
-    }
-    Engine::upgradeSession(loaded, storedVersion);
-    if (!Engine::valid(loaded)) {
-        Serial.println("SAVE_ERROR invalid track settings");
-        toast("SAVE INVALID - DEMO LOADED", 4000);
+    Result result;
+    { Lock lock; result = engine.restoreSong(loaded, sample.get()); }
+    if (result != Result::Ok) {
+        Serial.printf("LOAD_ERROR engine busy path=%s\n", path);
+        toast("STOP MUSIC AND WAIT FOR SILENCE", 3000);
         return false;
     }
-    size_t bytes = loaded.sampleCount * 2;
-    if (file.read(reinterpret_cast<uint8_t *>(engine.sample), bytes) != bytes ||
-        file.read(reinterpret_cast<uint8_t *>(&storedHash), sizeof(storedHash)) != sizeof(storedHash)) {
-        Serial.println("SAVE_ERROR short read"); return false;
-    }
-    hash = checksum(reinterpret_cast<const uint8_t *>(engine.sample), bytes, hash);
-    if (hash != storedHash) { Serial.println("SAVE_ERROR checksum"); return false; }
-    engine.session = loaded;
-    Serial.printf("SESSION_LOADED sample=%u legacy=%d\n", loaded.sampleCount, legacy);
+    Serial.printf("SESSION_LOADED path=%s sample=%u\n", path, loaded.sampleCount);
     return true;
 }
 
-void saveSession() {
-    if (!storageOk) return;
+bool saveSession(const char *path = "/orbit.bin", const char *temporary = "/orbit.tmp") {
+    if (!storageOk) { toast("STORAGE UNAVAILABLE", 4000); return false; }
     // Audio is stopped before flash writes; the audio task only renders silence.
     static Session copy;
-    { Lock lock; if (!engine.idle()) return; copy = engine.session; }
-    File file = LittleFS.open("/orbit.tmp", "w");
-    size_t bytes = copy.sampleCount * 2;
-    uint32_t hash = checksum(reinterpret_cast<const uint8_t *>(&copy), sizeof(copy));
-    hash = checksum(reinterpret_cast<const uint8_t *>(engine.sample), bytes, hash);
-    bool ok = file &&
-        file.write(reinterpret_cast<const uint8_t *>(&copy), sizeof(copy)) == sizeof(copy) &&
-        file.write(reinterpret_cast<const uint8_t *>(engine.sample), bytes) == bytes &&
-        file.write(reinterpret_cast<const uint8_t *>(&hash), sizeof(hash)) == sizeof(hash);
-    file.flush();
-    file.close();
-    if (ok) ok = LittleFS.rename("/orbit.tmp", "/orbit.bin");
-    if (!ok) {
-        Serial.println("SAVE_ERROR write/rename");
+    { Lock lock; if (!engine.idle()) return false; copy = engine.session; }
+    if (!writeSong(LittleFS, path, temporary, copy, engine.sample)) {
+        Serial.printf("SAVE_ERROR write/rename path=%s\n", path);
         toast("SAVE FAILED - CHECK STORAGE", 4000);
         lastEdit = millis();
-        return;
+        return false;
     }
-    savedRevision = engine.revision();
-    Serial.printf("SESSION_SAVED revision=%u bytes=%u\n", savedRevision, unsigned(sizeof(copy) + bytes));
-    toast("SESSION SAVED", 1000);
+    if (!strcmp(path, "/orbit.bin")) {
+        savedRevision = engine.revision();
+        toast("SESSION SAVED", 1000);
+    }
+    Serial.printf("SESSION_SAVED path=%s revision=%u bytes=%u\n", path, engine.revision(),
+        unsigned(sizeof(copy) + copy.sampleCount * sizeof(int16_t)));
+    return true;
+}
+
+void songPath(int slot, char *path, size_t size) {
+    snprintf(path, size, "/song%d.bin", slot + 1);
+}
+
+void openSongs() {
+    if (!storageOk) { toast("STORAGE UNAVAILABLE", 4000); return; }
+    for (int slot = 0; slot < SongSlots; ++slot) {
+        char path[20];
+        songPath(slot, path, sizeof(path));
+        songUsed[slot] = LittleFS.exists(path);
+    }
+    switchPage(Songs);
+}
+
+bool songStorageReady() {
+    if (!storageOk) { toast("STORAGE UNAVAILABLE", 4000); return false; }
+    bool ready;
+    {
+        Lock lock;
+        const Status s = engine.status();
+        ready = engine.idle() && !s.armed && !s.fxArmed && !s.fxRecording && !s.fxTouched;
+    }
+    if (!ready || referenceHz.load() || speakerMeterPending.load() || inputProbePending.load()) {
+        toast("STOP MUSIC AND WAIT FOR SILENCE", 3000);
+        return false;
+    }
+    return true;
+}
+
+void saveSongSlot() {
+    if (!songStorageReady()) return;
+    char path[20];
+    songPath(pendingSong, path, sizeof(path));
+    if (!saveSession(path, "/song.tmp")) return;
+    songUsed[pendingSong] = true;
+    switchPage(SongOptions);
+    toast("SONG SAVED", 2500);
+}
+
+void loadSongSlot() {
+    if (!songStorageReady()) return;
+    char path[20];
+    songPath(pendingSong, path, sizeof(path));
+    if (!loadSession(path)) return;
+    lastEdit = millis();
+    switchPage(Play);
+    toast("SONG LOADED - PRESS PLAY", 3000);
 }
 
 void pollButtons() {
@@ -1787,7 +1892,7 @@ void serialControl() {
                     char *end = nullptr;
                     long number = strtol(command + 5, &end, 10);
                     if (end == command + 5 || *end || number < 1 || number > DemoCount)
-                        Serial.println("COMMAND_ERROR use demo 1..12");
+                        Serial.printf("COMMAND_ERROR use demo 1..%d\n", DemoCount);
                     else activateDemo(int(number - 1));
                 }
             }
@@ -1827,9 +1932,12 @@ void serialControl() {
                 }
             } else if (!strncmp(command, "page ", 5)) {
                 int next = atoi(command + 5);
-                if ((next >= Play && next <= Settings) || (next >= Menu && next <= FxOptions))
+                if (next == Songs || next == SongOptions) {
+                    openSongs();
+                    if (storageOk && next == SongOptions) switchPage(SongOptions);
+                } else if ((next >= Play && next <= Settings) || (next >= Menu && next <= FxOptions))
                     openPerformance(Page(next));
-            } else Serial.println("COMMAND_ERROR use status/play/stop/record/note N/release/track N/pitch N/volume N/mic/page N/sounds/preview N/use-sound/cancel-sound/demos/demo 1..12/wake/sample-stats/sample-dump/input-probe/reboot");
+            } else Serial.println("COMMAND_ERROR use status/play/stop/record/note N/release/track N/pitch N/volume N/mic/page N/sounds/preview N/use-sound/cancel-sound/demos/demo N/wake/sample-stats/sample-dump/input-probe/reboot");
         } else if (length + 1 < sizeof(command)) command[length++] = c;
         else { length = 0; Serial.println("COMMAND_ERROR too long"); }
     }
@@ -1861,7 +1969,7 @@ void setup() {
         Serial.println("STORAGE_ERROR cannot mount");
         toast("STORAGE ERROR - NOT SAVING", 5000);
     }
-    if (!storageOk || !loadSession()) {
+    if (!storageOk || !LittleFS.exists("/orbit.bin") || !loadSession()) {
         engine.loadDemo();
         firstRun = true;
     }

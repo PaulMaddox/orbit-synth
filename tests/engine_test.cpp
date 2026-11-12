@@ -1,6 +1,7 @@
 #include "../Orbit/engine.h"
 #include "../Orbit/audio_input.h"
 #include "../Orbit/demo_sample.h"
+#include "../Orbit/six_seven.h"
 #include "../Orbit/screen_idle.h"
 #include "../Orbit/ui_layout.h"
 #include "../Orbit/touch_gesture.h"
@@ -115,6 +116,9 @@ int main() {
     assertCornerSafe(ui::SoundPrevious);
     assertCornerSafe(ui::SoundNext);
     for (const auto &rect : ui::SoundCards) assertCornerSafe(rect);
+    for (const auto &rect : ui::SongCards) assertCornerSafe(rect);
+    assertCornerSafe(ui::SongSave);
+    assertCornerSafe(ui::SongLoad);
     assert(ui::hit(ui::SoundCards, 9, 113) == 0);
     assert(ui::hit(ui::SoundCards, 230, 205) == 3);
     assert(ui::hit(ui::SoundCards, 120, 170) == -1);
@@ -205,7 +209,26 @@ int main() {
     assert(Engine::midiNote(1, 0, 0, 0) == 48);
 
     assert(engine->loadDemo() == Result::Ok);
-    assert(std::strcmp(DemoLibrary[0].name, "IRON") == 0);
+    assert(std::strcmp(DemoLibrary[0].name, "SIX SEVEN") == 0);
+    assert(engine->session.bpm == 116 && engine->session.root == 5 && engine->session.scale == 2);
+    assert(engine->session.activeScene == 1 && engine->session.tracks[0].patch == 11);
+    assert(engine->session.tracks[3].pitch == -12 && engine->session.tracks[3].space == 24);
+    assert(engine->session.sampleCount == SampleCapacity);
+    assert(std::equal(engine->sample, engine->sample + engine->session.sampleCount,
+        DemoVoices[SixSevenArrangement].samples));
+    for (int section = -1; section < SceneCount; ++section) {
+        const Track *actual = section < 0 ? engine->session.tracks : engine->session.scenes[section].tracks;
+        const Track *expected = section < 0 ? SixSevenSong.tracks : SixSevenSong.scenes[section].tracks;
+        for (int track = 0; track < TrackCount; ++track) {
+            assert(actual[track].count == expected[track].count);
+            assert(actual[track].patch == expected[track].patch && actual[track].pitch == expected[track].pitch);
+            assert(actual[track].muted == expected[track].muted);
+            assert(std::memcmp(actual[track].notes, expected[track].notes,
+                actual[track].count * sizeof(Note)) == 0);
+        }
+    }
+    assert(engine->loadDemo(1) == Result::Ok);
+    assert(std::strcmp(DemoLibrary[1].name, "IRON") == 0);
     assert(engine->session.bpm == 138 && engine->session.root == 2 && engine->session.scale == 0);
     assert(engine->session.tracks[0].patch == 17 && engine->session.tracks[0].pitch == -12);
     for (const Scene &scene : engine->session.scenes) {
@@ -215,8 +238,8 @@ int main() {
     assert(std::equal(engine->sample, engine->sample + engine->session.sampleCount, DemoVoices[5].samples));
     {
         auto nextDemo = std::make_unique<Engine>();
-        assert(nextDemo->loadDemo(1) == Result::Ok);
-        assert(std::strcmp(DemoLibrary[1].name, "SUNLIT") == 0);
+        assert(nextDemo->loadDemo(2) == Result::Ok);
+        assert(std::strcmp(DemoLibrary[2].name, "SUNLIT") == 0);
         assert(nextDemo->session.bpm == 100 && nextDemo->session.root == 0 && nextDemo->session.scale == 1);
         assert(nextDemo->session.tracks[0].patch == 0);
         assert(nextDemo->session.sampleCount == DemoVoices[0].count);
@@ -224,7 +247,7 @@ int main() {
             DemoVoices[0].samples));
     }
     // Keep the existing capture/tail timing fixture on its acoustic-pop arrangement.
-    assert(engine->loadDemo(1) == Result::Ok);
+    assert(engine->loadDemo(2) == Result::Ok);
     const uint16_t demoLeadCount = engine->session.tracks[0].count;
     engine->setBpm(110);
     engine->setSwing(0);
@@ -1019,7 +1042,9 @@ int main() {
         }
     }
 
-    for (int index = 6; index < DemoCount; ++index) {
+    for (int index = 0; index < DemoCount; ++index) {
+        if (DemoLibrary[index].arrangement < 6 || DemoLibrary[index].arrangement == SixSevenArrangement)
+            continue;
         auto demo = std::make_unique<Engine>();
         demo->loadDemo(index);
         for (int section = 0; section < SceneCount; ++section) {
@@ -1075,7 +1100,7 @@ int main() {
     assert(mix->loadDemo(0) == Result::Busy);
     assert(mix->status().capturing);
     auto sections = std::make_unique<Engine>();
-    sections->loadDemo();
+    sections->loadDemo(1);
     assert(sections->status().scene == 3 && sections->status().nextScene == -1);
     assert(sections->session.scenes[0].tracks[0].muted);
     assert(!sections->session.scenes[0].tracks[2].muted);
@@ -1187,7 +1212,7 @@ int main() {
     assert(!Engine::valid(*invalidPiece));
 
     auto moves = std::make_unique<Engine>();
-    moves->loadDemo();
+    moves->loadDemo(1);
     assert(moves->touchFx(-1, 50) == Result::Invalid);
     assert(moves->touchFx(50, 101) == Result::Invalid);
     uint32_t untouchedRevision = moves->revision();

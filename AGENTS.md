@@ -31,7 +31,7 @@ details here and update the user guide and screenshots when behavior changes.
 - Development/test songs, tracks and microphone content are disposable. Do not
   spend time making backups or reverse-engineering restoration of test music.
   **Keep the product's ordinary save, undo and confirmation behavior.**
-- Never commit personal recordings, device dumps, credentials, raw sample caches,
+- Never commit device dumps, credentials, raw sample caches,
   downloaded tools or generated build artifacts. Check `.gitignore` and the
   staged diff before pushing. Generated original demo phrases are intentional assets.
 - Do not bypass Windows security restrictions. Use a trusted installed toolchain.

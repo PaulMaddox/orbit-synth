@@ -11,6 +11,8 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include "esp_sleep.h"
+#include "esp_timer.h"
 #include "FreeSansBold10pt7b.h"
 #include "board.h"
 #include "engine.h"
@@ -58,6 +60,10 @@ int pendingScene = 0;
 uint32_t fullDraws = 0, mixerMoves = 0;
 std::atomic<uint32_t> audioMaxUs{0}, audioErrors{0}, renderedBlocks{0};
 std::atomic<uint32_t> captureDrops{0};
+std::atomic<bool> audioPauseRequested{false}, audioPaused{false};
+bool audioStandby = false, cpuSleepFailed = false;
+uint32_t lightSleeps = 0;
+uint64_t lightSleepUs = 0;
 std::atomic<bool> inputProbePending{false};
 int16_t inputProbe[64 * InputFrameSamples]{};
 std::atomic<bool> speakerMeterPending{false};
@@ -143,9 +149,12 @@ void switchPage(Page next) {
     dirty = true;
 }
 
+void resumeFromSleep();
+
 bool userActivity() {
     bool woke = screenIdle.activity(millis());
     if (woke) {
+        resumeFromSleep();
         dirty = true;
         backlightPending = true;
         Serial.println("SCREEN_WAKE");
@@ -189,9 +198,9 @@ void drawBattery() {
     batteryDirty = false;
 }
 
-void pollBattery() {
+void pollBattery(uint32_t interval = 2000) {
     uint32_t now = millis();
-    if (now - lastBatteryRead < 2000) return;
+    if (now - lastBatteryRead < interval) return;
     lastBatteryRead = now;
     board::BatteryStatus next = board::readBattery();
     if (next.valid != battery.valid || next.connected != battery.connected ||
@@ -1224,6 +1233,12 @@ void audioTask(void *) {
     bool wasCapturing = false;
     uint32_t referencePhase = 0, referenceLeft = 0;
     for (;;) {
+        if (audioPauseRequested.load()) {
+            audioPaused.store(true);
+            while (audioPauseRequested.load()) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            audioPaused.store(false);
+            continue;
+        }
         uint32_t start = micros();
         bool capturing;
         {
@@ -1295,6 +1310,53 @@ void audioTask(void *) {
         wasCapturing = capturing;
         ++renderedBlocks;
     }
+}
+
+void resumeFromSleep() {
+    if (!audioStandby) return;
+    if (!board::resumeAudio()) {
+        gfx->displayOn();
+        gfx->fillScreen(BG);
+        heading(24, 90, "Wake error", CORAL);
+        text(24, 120, "PLEASE RESTART ORBIT");
+        digitalWrite(6, HIGH);
+        Serial.printf("FATAL sleep restore: %s\n", board::error());
+        while (true) delay(1000);
+    }
+    audioPauseRequested.store(false);
+    xTaskNotifyGive(audioHandle);
+    audioStandby = false;
+    gfx->displayOn();
+    board::amplifier(true);
+}
+
+bool enterSleep() {
+    esp_err_t result = esp_sleep_enable_timer_wakeup(250000);
+    if (result != ESP_OK) {
+        Serial.printf("SLEEP_ERROR timer wake: %s\n", esp_err_to_name(result));
+        return false;
+    }
+    audioPauseRequested.store(true);
+    uint32_t start = millis();
+    while (!audioPaused.load() && millis() - start < 250) delay(1);
+    if (!audioPaused.load()) {
+        audioPauseRequested.store(false);
+        xTaskNotifyGive(audioHandle);
+        Serial.println("SLEEP_ERROR audio pause timed out");
+        return false;
+    }
+    digitalWrite(6, LOW);
+    backlightPending = false;
+    audioStandby = true;
+    if (!board::suspendAudio()) {
+        Serial.println("SLEEP_ERROR peripheral standby");
+        resumeFromSleep();
+        return false;
+    }
+    gfx->displayOff();
+    cpuSleepFailed = false;
+    Serial.println("SCREEN_SLEEP audio=standby");
+    return true;
 }
 
 uint32_t checksum(const uint8_t *data, size_t size, uint32_t hash = 2166136261u) {
@@ -1418,6 +1480,39 @@ void pollButtons() {
     }
 }
 
+void pollSleeping() {
+    pollButtons();
+    // PWR has no MCU interrupt; a short timer wake also notices USB being plugged in.
+    pollBattery(250);
+    if (!screenIdle.sleeping()) return;
+    if (board::touchWakePending()) {
+        userActivity();
+        suppressTouch = true;
+        return;
+    }
+    if (battery.valid && !battery.usb && !cpuSleepFailed) {
+        int64_t start = esp_timer_get_time();
+        esp_err_t result = board::lightSleep();
+        if (result == ESP_OK) {
+            ++lightSleeps;
+            lightSleepUs += uint64_t(esp_timer_get_time() - start);
+        }
+        if (result == ESP_ERR_SLEEP_REJECT ||
+            (result == ESP_OK && esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_GPIO)) {
+            pollButtons();
+            if (screenIdle.sleeping()) {
+                userActivity();
+                suppressTouch = true;
+            }
+        } else if (result != ESP_OK) {
+            Serial.printf("SLEEP_ERROR light sleep: %s\n", esp_err_to_name(result));
+            cpuSleepFailed = true;
+            userActivity();
+            toast("LOW POWER ERROR - RESTART", 4000);
+        }
+    } else delay(20);
+}
+
 void serialControl() {
     static char command[48];
     static size_t length = 0;
@@ -1427,6 +1522,7 @@ void serialControl() {
         if (c == '\n') {
             command[length] = 0;
             length = 0;
+            if (strcmp(command, "status") && strcmp(command, "fingerprint")) userActivity();
             if (!strcmp(command, "screenshot")) {
 #ifdef ORBIT_SCREENSHOTS
                 Arduino_Canvas canvas(board::Width, board::Height, nullptr);
@@ -1467,7 +1563,8 @@ void serialControl() {
                     "screen_sleep=%d idle_ms=%u patch=%u,%u,%u,%u sound_choice=%d sound_family=%d "
                     "scene=%u next_scene=%d slices=%d fx_rec=%d fx_armed=%d fx_on=%d fx_touch=%d "
                     "fx_x=%u fx_y=%u fx_active=%d capture=%d bank=sampled-v2 "
-                    "preparation=%d countdown=%u preparation_loop=%u\n",
+                    "preparation=%d countdown=%u preparation_loop=%u "
+                    "audio_sleep=%d light_sleeps=%u light_sleep_us=%llu sleep_error=%d\n",
                     s.playing, s.recording, s.armed, s.step, s.selected, s.bpm, s.root, s.scale,
                     s.counts[0], s.counts[1], s.counts[2], s.counts[3], s.sampleCount,
                     ESP.getFreeHeap(), audioMaxUs.load(), audioErrors.load(), renderedBlocks.load(),
@@ -1481,7 +1578,8 @@ void serialControl() {
                     s.patches[0], s.patches[1], s.patches[2], s.patches[3], pendingSound + 1, soundFamily + 1,
                     s.scene + 1, s.nextScene < 0 ? 0 : s.nextScene + 1, s.slices,
                     s.fxRecording, s.fxArmed, s.fxEnabled, s.fxTouched, s.effect.x, s.effect.y, s.effect.active,
-                    s.capturing, int(s.preparation), s.countdown, s.preparationLoop);
+                    s.capturing, int(s.preparation), s.countdown, s.preparationLoop,
+                    audioStandby, lightSleeps, (unsigned long long)lightSleepUs, cpuSleepFailed);
             } else if (!strcmp(command, "sample-stats")) {
                 uint32_t count;
                 bool capturing;
@@ -1776,12 +1874,16 @@ void setup() {
     if (firstRun) toast("PRESS PLAY TO HEAR THE DEMO", 5000);
     if (!board::micAvailable()) toast("MIC UNAVAILABLE - SYNTH READY", 5000);
     screenIdle.activity(millis());
-    Serial.printf("ORBIT_READY version=3.2.1 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
+    Serial.printf("ORBIT_READY version=3.2.2 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
         board::micAvailable(), storageOk, ESP.getFreeHeap());
 }
 
 void loop() {
     serialControl();
+    if (screenIdle.sleeping()) {
+        pollSleeping();
+        return;
+    }
     pollTouch();
     pollButtons();
     pollBattery();
@@ -1816,12 +1918,20 @@ void loop() {
     if (storageOk && s.revision != savedRevision && !s.playing && !s.capturing &&
         !touchDown && s.livePad < 0 && millis() - lastEdit > 1000) saveSession();
     uint32_t now = millis();
-    bool keepAwake = s.playing || s.recording || s.armed || s.capturing;
+    bool audioIdle;
+    { Lock lock; audioIdle = engine.idle(); }
+    bool keepAwake = !audioIdle || s.playing || s.recording || s.armed || s.capturing ||
+        s.fxRecording || s.fxArmed || s.fxTouched || touchDown || suppressTouch ||
+        referenceHz.load() || speakerMeterPending.load() || inputProbePending.load() ||
+        (page == Confirm && confirmation == RecordTrack) ||
+        (storageOk && s.revision != savedRevision);
     if (keepAwake && screenIdle.sleeping()) userActivity();
     if (screenIdle.sleepIfIdle(now, keepAwake)) {
-        digitalWrite(6, LOW);
-        backlightPending = false;
-        Serial.println("SCREEN_SLEEP");
+        if (!enterSleep()) {
+            userActivity();
+            toast("SLEEP FAILED - TRY RESTART", 4000);
+        }
+        return;
     }
     if (toastText[0] && int32_t(now - toastUntil) >= 0) {
         toastText[0] = 0;

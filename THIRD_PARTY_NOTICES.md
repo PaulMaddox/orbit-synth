@@ -24,8 +24,10 @@ redistributing a recording bank or firmware. No source author's endorsement is i
 - `Orbit/es8311.cpp`, `es8311.h` and `es8311_reg.h` are the Espressif ES8311 driver
   distributed with Waveshare examples, under Apache-2.0. Original source notices
   and [the full license](Orbit/LICENSE-APACHE-2.0.txt) are retained.
-- ES7210 register initialization follows Espressif's Apache-2.0
+- ES7210 register initialization and standby follow Espressif's Apache-2.0
   [esp_codec_dev driver](https://github.com/espressif/esp-adf/tree/master/components/esp_codec_dev/device/es7210).
+- ES8311 standby follows Espressif's Apache-2.0
+  [esp_codec_dev driver](https://github.com/espressif/esp-adf/tree/master/components/esp_codec_dev/device/es8311).
 - [GFX Library for Arduino](https://github.com/moononournation/Arduino_GFX) and
   [XPowersLib](https://github.com/lewisxhe/XPowersLib) are installed dependencies,
   not relicensed ORBIT code. Their upstream licenses apply. The graphics build

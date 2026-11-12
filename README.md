@@ -328,8 +328,9 @@ idle. Wait for **SESSION SAVED** before powering off. The last session returns o
 the next boot; there is no separate Save button.
 
 The screen sleeps after **60 seconds** of stopped inactivity. Playing, recording
-and microphone capture keep it awake. This saves the display, not a full processor
-deep-sleep mode. Battery and USB indicators reflect actual hardware readings;
+and microphone capture keep it awake. Sleep reduces battery use while keeping
+your session ready. Touch the screen or press a button to wake it; that first
+gesture only wakes the device. Battery and USB indicators reflect actual hardware readings;
 USB-only operation does not invent a battery percentage.
 
 ## Troubleshooting

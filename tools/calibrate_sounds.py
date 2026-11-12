@@ -1,0 +1,123 @@
+"""Reproduce the speaker-weighted, per-note synth level trims."""
+import math
+import pathlib
+import subprocess
+import argparse
+import json
+import re
+
+root = pathlib.Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--speaker-check", type=pathlib.Path,
+                    help="Refine trims from the non-destructive onboard speaker check")
+parser.add_argument("--reset-acoustic", action="store_true",
+                    help="Discard residual corrections from a previous instrument library")
+args = parser.parse_args()
+adjustments = root / "tests" / "speaker_adjustments.h"
+if args.reset_acoustic:
+    header = ["// Acoustic residuals for the current instrument library.",
+              "#pragma once", "namespace orbit::test {",
+              "constexpr double SpeakerAdjustments[2][30][2] = {"]
+    for track in range(2):
+        header.extend(["    {", *["        {1.000000, 1.000000}," for _ in range(30)], "    },"])
+    header.extend(["};", "}", ""])
+    adjustments.write_text("\n".join(header), encoding="ascii")
+if args.speaker_check:
+    check = json.loads(args.speaker_check.read_text())
+    if check.get("metric") != "peak80ms-v1" or check["baseline"].get("bank") != "sampled-v2":
+        raise ValueError("This library requires sampled-v2 peak80ms-v1 acoustic measurements")
+    if check["baseline"].get("root") != "0":
+        raise ValueError("Use the C key for residual speaker calibration")
+    measurements = {(row["track"], row["pitch"], row["sound"]): row["rms"]
+                    for row in check["measurements"]}
+    expected = {(track, pitch, sound) for track, pitch in ((0, -12), (0, 0), (1, 0))
+                for sound in range(30)}
+    if (set(measurements) != expected or len(check["measurements"]) != 90 or
+            check["fingerprint"] != check["after"]):
+        raise ValueError("Incomplete or state-changing speaker check")
+    if check["health"]["audio_errors"] != check["baseline"]["audio_errors"]:
+        raise ValueError("Audio errors during speaker check")
+    if min(measurements.values()) < check["noise_rms"] * 8:
+        raise ValueError("Insufficient signal-to-noise ratio for acoustic calibration")
+    previous = [(1.0, 1.0)] * 60
+    if adjustments.exists():
+        previous = [tuple(map(float, pair)) for pair in
+                    re.findall(r"\{([0-9.]+), ([0-9.]+)\}", adjustments.read_text())]
+        if len(previous) != 60:
+            raise ValueError("Invalid previous speaker adjustments")
+    header = ["// Refined from non-recording onboard measurements at MIDI 48 and 60.",
+              "#pragma once", "namespace orbit::test {",
+              "constexpr double SpeakerAdjustments[2][30][2] = {"]
+    for track in range(2):
+        header.append("    {")
+        for sound in range(30):
+            pitches = (-12, 0) if track == 0 else (0, 0)
+            values = [previous[track * 30 + sound][i] *
+                      measurements[track, pitch, sound] / 500
+                      for i, pitch in enumerate(pitches)]
+            if any(not 0.5 <= value <= 2 for value in values):
+                raise ValueError(f"Excessive acoustic correction for sound {sound}: {values}")
+            header.append("        {" + ", ".join(f"{value:.6f}" for value in values) + "},")
+        header.append("    },")
+    header.extend(["};", "}", ""])
+    adjustments.write_text("\n".join(header), encoding="ascii")
+exe = root / "tools" / "calibrate_sounds.exe"
+try:
+    subprocess.run(
+        ["g++", "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror",
+         "-DORBIT_CALIBRATE", str(root / "tools" / "calibrate_sounds.cpp"),
+         str(root / "Orbit" / "engine.cpp"), str(root / "Orbit" / "sample_bank.cpp"),
+         str(root / "Orbit" / "sample_bank_lookup.cpp"), str(root / "Orbit" / "demo_sample.cpp"),
+         "-o", str(exe)], check=True,
+    )
+    output = subprocess.check_output([str(exe)], text=True)
+    rows = {}
+    arcade = {}
+    unsafe = []
+    for line in output.splitlines():
+        track, patch, midi, tone, short, held, *steps = line.split()
+        short, held = float(short), float(held)
+        if min(short, held) <= 0:
+            raise ValueError(f"Inaudible recipe: {line}")
+        trim = round(4096 * 72 / short)
+        if not 16 <= trim <= 32768:
+            unsafe.append((trim, line))
+        rows[int(track), int(patch), int(midi), int(tone)] = trim
+        if steps:
+            values = [round(4096 * 80 / float(step)) for step in steps]
+            if any(not 16 <= value <= 32768 for value in values):
+                raise ValueError(f"Unsafe Arcade step trims: {line}")
+            arcade[int(track), int(midi), int(tone)] = values
+    if unsafe:
+        for trim, line in sorted(unsafe, reverse=True)[:8]:
+            print(f"Unsafe level trim {trim / 4096:.2f}x: {line}")
+        raise ValueError(f"{len(unsafe)} unsafe trims; improve recipes before generating levels")
+    header = [
+        "// Generated by tools/calibrate_sounds.py; Q12 trims at tones 0, 20, 40, 60, 80, 100.",
+        "#pragma once", "#include <stdint.h>", "", "namespace orbit {",
+        "constexpr uint16_t SoundLevels[2][30][65][6] = {",
+    ]
+    for track in range(2):
+        header.append("    {")
+        for patch in range(30):
+            header.append(f"        {{ // sound {patch}")
+            for midi in range(36, 101):
+                values = ", ".join(str(rows[track, patch, midi, tone]) for tone in range(0, 101, 20))
+                header.append(f"            {{{values}}},")
+            header.append("        },")
+        header.append("    },")
+    header.extend(["};", "", "constexpr uint16_t ArcadeLevels[2][65][6][3] = {"])
+    for track in range(2):
+        header.append("    {")
+        for midi in range(36, 101):
+            tones = ["{" + ", ".join(str(value) for value in arcade.get((track, midi, tone), [4096] * 3)) + "}"
+                     for tone in range(0, 101, 20)]
+            header.append("        {" + ", ".join(tones) + "},")
+        header.append("    },")
+    header.extend(["};", "}", ""])
+    (root / "Orbit" / "sound_levels.h").write_text("\n".join(header), encoding="ascii")
+    print(f"Calibrated {len(rows)} pitch/tone/role combinations; "
+          f"trim range {min(rows.values()) / 4096:.2f}..{max(rows.values()) / 4096:.2f}x; "
+          f"highest trim at {max(rows, key=rows.get)}")
+finally:
+    exe.unlink(missing_ok=True)

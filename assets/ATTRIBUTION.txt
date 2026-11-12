@@ -1,0 +1,46 @@
+ORBIT 3.1 instrument recordings
+
+VSCO 2 Community Edition
+Sam Gossner / Versilian Studios and Simon Dalzell; sample cutting by
+Elan Hickler / Soundemote and contributors.
+https://github.com/sgossner/VSCO-2-CE
+Revision: 440300901dfe9275fd84e0b7763af1f8443ae62e
+License: CC0 1.0 Universal. Full text: licenses\vsco-LICENSE.txt
+Used for orchestral instruments, harp, upright piano, organ and mallets.
+
+Shinyguitar
+D. Smolken / Karoryfer Samples, archtop guitar microphone and pickup recordings.
+https://github.com/sfzinstruments/karoryfer.shinyguitar
+Revision: 57243cca85277dbcc120ce17c6178032f93c80f3
+License: CC0 1.0 Universal. Full text: licenses\guitar-LICENSE.txt
+Used for acoustic, clean electric and processed metal guitar.
+
+MTG Solo Saxophones
+MTG (Music Technology Group), Freesound; editing, looping and SFZ mapping
+by kinwie; distributed by sfzinstruments.
+https://github.com/sfzinstruments/MTG.SoloSax
+https://freesound.org/people/MTG/
+Revision: b494d256549b3d088fdec176ce82867f8a1f58b2
+License: Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+Full text: licenses\sax-LICENSE.txt
+Used for soft and forte alto saxophone recordings. The recorded tuning
+corrections supplied by the SFZ author are applied during conversion.
+Retain this attribution and license reference with redistributed firmware
+or sample banks. No endorsement by the original authors is implied.
+
+ORBIT modifications
+Individual source paths, MIDI roots, layers and integrity hashes are in
+instruments.json. Recordings were downmixed, resampled, DC-filtered, trimmed,
+faded, loudness-matched and logarithmically companded. Quiet sustained-note
+pre-rolls are trimmed for responsive short hits, retaining a brief natural
+attack and a four-millisecond fade without speeding up or pitch-shifting
+the recording. Sustained recordings
+have crossfaded body loops and release continuations. Metal guitar adds
+oversampled soft saturation and cabinet filtering. Plucked double bass
+adds source-relative low-cut EQ for the built-in speaker's limited bandwidth.
+These changes do not make the recordings proprietary Casio/other keyboard samples.
+
+Electronic presets, demo arrangements and vocal phrases are original ORBIT
+material. Vocal phrases are generated locally with Windows speech synthesis
+using David, Hazel and Zira and expressive SSML; they are not user recordings.

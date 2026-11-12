@@ -8,6 +8,12 @@
 
 *Device photo: [Waveshare](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm).*
 
+Hear the **IRON** demo with a Saw Stack melody (15 seconds, with sound).
+
+https://github.com/user-attachments/assets/3ad76ef2-7beb-4f6c-ac06-6735e02b021a
+
+*Animated product preview with actual ORBIT audio.*
+
 Make a beat, add a bassline, play an instrument, and turn your voice into music.
 ORBIT is a standalone, beginner-friendly instrument: no computer, account, network,
 or music theory is needed once it is installed.

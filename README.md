@@ -1,6 +1,6 @@
 # ORBIT
 
-**A pocket music maker for the [Waveshare ESP32-C6 Touch-LCD-1.83](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm).**
+**A pocket music maker for the [Waveshare ESP32-C6 Touch-LCD-1.83](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm) (~$20 on AliExpress etc).**
 
 <a href="https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm">
   <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 device" width="360">

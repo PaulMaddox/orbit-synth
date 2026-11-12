@@ -24,14 +24,16 @@ details here and update the user guide and screenshots when behavior changes.
   keyboard samples. Tuba is an intentional first-class instrument.
 - All demos are original compositions; style inspiration is not permission to
   reproduce someone else's melody, lyrics or arrangement.
-- IRON is picker/serial demo 1 and the fresh-install fallback, with Saw Stack
-  (17) on MELODY in every scene. Existing valid saved sessions still restore.
+- SIX SEVEN is picker/serial demo 1 and the fresh-install fallback, using its
+  curated SONG 1 arrangement and approved non-personal two-second voice asset.
+  Existing valid saved sessions still restore; loading demos preserves master volume.
+  IRON remains demo 2, with Saw Stack (17) on MELODY in every scene.
   `DemoInfo::arrangement` maps presentation order to stable composition/vocal-bank
   IDs; do not reorder generated voices or change other songs when moving a card.
 - Development/test songs, tracks and microphone content are disposable. Do not
   spend time making backups or reverse-engineering restoration of test music.
   **Keep the product's ordinary save, undo and confirmation behavior.**
-- Never commit personal recordings, device dumps, credentials, raw sample caches,
+- Never commit device dumps, credentials, raw sample caches,
   downloaded tools or generated build artifacts. Check `.gitignore` and the
   staged diff before pushing. Generated original demo phrases are intentional assets.
 - Do not bypass Windows security restrictions. Use a trusted installed toolchain.
@@ -43,6 +45,7 @@ details here and update the user guide and screenshots when behavior changes.
 |---|---|
 | `Orbit/app.cpp` | Drawing, touch/buttons, page flows, audio task, saves, serial diagnostics |
 | `Orbit/engine.h`, `engine.cpp` | Portable music engine, voices, sequencing, scenes, FX, sampling, demos |
+| `Orbit/song_storage.h` | Shared checksummed session/slot reader and atomic writer |
 | `Orbit/board.h`, `board.cpp` | I2C peripherals, power, codecs, I2S and touch |
 | `Orbit/audio_input.h` | Verified microphone word layout |
 | `Orbit/ui_layout.h` | Shared touch/drawing rectangles |
@@ -61,6 +64,7 @@ details here and update the user guide and screenshots when behavior changes.
 | `tools/build_instruments.py` | Reproducible sample preparation and bank generation |
 | `tools/calibrate_sounds.cpp`, `.py` | Offline synthesis/speaker model calibration |
 | `tools/make_demo_voices.py`, `tools/demo-voices/` | Local SSML generation and resulting original WAV assets |
+| `assets/six_seven.json`, `tools/build_six_seven.py`, `Orbit/six_seven.h` | Curated Six Seven score and reproducible generated arrangement |
 | `tools/capture_screen.py` | Checksum-verified real framebuffer capture to PNG |
 | `tests/engine_test.cpp` | Native behavior/audio/layout regressions |
 | `tests/sound_loudness.h`, `speaker_adjustments.h` | Measured speaker response and empirical residual corrections |
@@ -287,6 +291,19 @@ SSML gives word-level pitch/rate variation. It writes the WAV assets and
 Phrases are trimmed, DC-removed, peak-normalized, faded and limited to 1.25 s.
 Do not use an obsolete single-demo generator.
 
+Six Seven is stable arrangement/voice ID 12, appended without renumbering the
+original twelve composition/voice IDs. Its approved non-personal audio is
+`tools/demo-voices/six-seven.wav`: exactly 32,000 mono PCM16 frames at 16 kHz.
+Do not trim, normalize, pitch-shift or resynthesize that source. Its curated
+musical settings, active scene, notes and FX are in `assets/six_seven.json`;
+no device filesystem image or saved-session dump is a source asset.
+Regenerate the arrangement and encode the existing WAVs without changing them:
+
+```sh
+python tools/build_six_seven.py
+python tools/make_demo_voices.py --encode-only
+```
+
 ## Loudness: measure the right thing
 
 - Tiny-speaker fundamentals can be almost inaudible. Bass, kick and tom need
@@ -398,6 +415,17 @@ Session format is **version 5**, magic `0x4f524254`.
 LittleFS writes `/orbit.tmp`, FNV-1a checksum, then atomic rename to `/orbit.bin`.
 Save only stopped/idle, after voices/echo settle; no writes during performance.
 
+The SESSION footer opens SONGS: eight numbered device slots in `/song1.bin` through
+`/song8.bin`, using the same versioned format including the microphone sample.
+Slots use `/song.tmp` and atomic replacement without removing the previous file.
+Autosave continues independently in `/orbit.bin`; editing or loading never writes
+back to a slot automatically. Confirm slot replacement and every load.
+`song_storage.h` hashes stored bytes before migration and validates into staging
+memory before `Engine::restoreSong` commits under the mutex. Failed reads,
+checksums, allocation or validation must leave both live session and sample intact.
+Only stopped, settled engines can restore; clear transient voices, delays and undo.
+Never hold the engine mutex across filesystem transfers.
+
 `Track` remains 584 bytes: pitch offset 582, reserved byte offset 583.
 Session tracks start at offset 16; the old v2 prefix is 2,352 bytes.
 Do not casually change packed layouts or remove static assertions.
@@ -446,6 +474,17 @@ g++ -std=c++17 -O2 -Wall -Wextra -Werror tests/engine_test.cpp Orbit/engine.cpp 
 
 On Windows, use `-o tests\engine_test.exe` and run `.\tests\engine_test.exe`.
 Link every required translation unit if adding one.
+The focused storage regression uses the same engine translation units:
+
+```sh
+g++ -std=c++17 -O2 -Wall -Wextra -Werror tests/song_storage_test.cpp Orbit/engine.cpp Orbit/sample_bank.cpp Orbit/sample_bank_lookup.cpp Orbit/demo_sample.cpp -o tests/song_storage_test
+./tests/song_storage_test
+```
+
+On Windows, use `-o tests\song_storage_test.exe` and run
+`.\tests\song_storage_test.exe`. It covers full-sample round trips, independent slots,
+replacement/write failures, corrupt/short reads, legacy file migration and restore state.
+
 The suite covers layout safety, valid saves/migration, natural registers, gestures,
 exact 60/120/180 BPM hit/preview lifetimes, tempo changes mid-note, fades, held
 release, all 32 preparation beats and stage boundaries, cancellation, practice
@@ -507,7 +546,7 @@ status / play / stop / record / track 0..3 / note 0..7 / release
 pitch -12..12 / volume 0..80 / echo 0..100
 mic / sample-stats / sample-dump / input-probe / reboot
 sounds / preview 1..30 / use-sound / cancel-sound
-demos / demo 1..12
+demos / demo 1..13
 menu / scenes / slices / whole / fx
 scene 1..4 / copy-scene 1..4
 fx X Y / fx-release / fx-record / fx-toggle / fx-undo / fx-clear
@@ -522,7 +561,8 @@ The removed `mode` command must stay removed.
 
 Pages: Play 0, Mixer 1, Sound 2, Mic 3, Session 4, Confirm 5, Demos 6,
 SoundPicker 7, Explore 8, Scenes 9, Pieces 10, LiveFX 11, CopyScene 12, FXOptions 13.
-`page` intentionally accepts 0..4 and 8..13; use `sounds` or `demos` for those pickers.
+Songs 14 and SongOptions 15 are the saved-song library and selected slot.
+`page` intentionally accepts 0..4 and 8..15; use `sounds` or `demos` for those pickers.
 `tap` calls the touch-release handler for a button; it is not a fake held pad.
 
 `status` includes transport, counts, pitch/tone/echo, battery validity, screen

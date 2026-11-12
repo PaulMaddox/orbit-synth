@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "demo_sample.h"
+#include "six_seven.h"
 #ifndef ORBIT_CALIBRATE
 #include "sound_levels.h"
 #endif
@@ -46,6 +47,7 @@ int32_t bandlimitedSaw(uint32_t phase, uint32_t increment) {
 }
 
 const DemoInfo DemoLibrary[DemoCount] = {
+    {"SIX SEVEN", "BRASS + VOICE", SixSevenSong.bpm, SixSevenArrangement},
     {"IRON", "HEAVY SYNTH", 138, 5},
     {"SUNLIT", "ACOUSTIC POP", 100, 0},
     {"VELVET", "LATE-NIGHT JAZZ", 112, 1},
@@ -647,6 +649,27 @@ void arrangePopScene(Scene &scene, int song, int section) {
 }
 }
 
+Result Engine::restoreSong(const Session &song, const int16_t *recording) {
+    if (!valid(song) || (song.sampleCount && !recording)) return Result::Invalid;
+    if (!idle() || armed_ || fxArmed_ || fxRecording_ || fxTouched_) return Result::Busy;
+    stop();
+    for (Voice &voice : voices_) voice.active = false;
+    std::memset(delay_, 0, sizeof(delay_));
+    std::memset(fxDelay_, 0, sizeof(fxDelay_));
+    delayPosition_ = fxDelayPosition_ = 0;
+    fxFilter_ = fxMix_ = fxEcho_ = 0;
+    fxCutoff_ = 65536;
+    highpassInput_ = highpassOutput_ = outputGain_ = 0;
+    peak_ = 0;
+    selected_ = 0;
+    undoValid_ = fxUndoValid_ = false;
+    liveHeld_ = liveSliced_ = false;
+    session = song;
+    if (song.sampleCount) std::copy_n(recording, song.sampleCount, sample);
+    ++revision_;
+    return Result::Ok;
+}
+
 Result Engine::loadDemo(int demo) {
     if (demo < 0 || demo >= DemoCount) return Result::Invalid;
     if (capturing_) return Result::Busy;
@@ -658,6 +681,16 @@ Result Engine::loadDemo(int demo) {
     session.bpm = DemoLibrary[demo].bpm;
     // Keep composition and generated vocal IDs stable when reordering the picker.
     demo = DemoLibrary[demo].arrangement;
+    if (demo == SixSevenArrangement) {
+        uint8_t volume = session.volume;
+        session = SixSevenSong;
+        session.volume = volume;
+        session.sampleCount = DemoVoices[demo].count;
+        std::copy_n(DemoVoices[demo].samples, session.sampleCount, sample);
+        undoValid_ = fxUndoValid_ = false;
+        ++revision_;
+        return Result::Ok;
+    }
     constexpr uint8_t roots[] = {0, 2, 7, 5, 0, 2, 7, 2, 0, 0, 9, 5};
     constexpr uint8_t lead[] = {0, 10, 15, 11, 17, 4};
     constexpr uint8_t bass[] = {22, 22, 14, 28, 21, 23};

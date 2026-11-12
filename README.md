@@ -38,9 +38,10 @@ device, not design mockups.
 - **Microphone sampling:** record up to two seconds, play it at different pitches,
   or divide it into eight playable pieces.
 - **Live effects:** finger-controlled filtering and echo, with recordable movements.
-- **12 original demos:** acoustic pop, jazz, cinematic, brass band, club,
+- **13 original demos:** acoustic pop, jazz, cinematic, brass band, club,
   heavy guitar and bright retro dance styles.
-- **Automatic saving, battery indication and automatic power-off.**
+- **Eight saved songs**, plus automatic saving of your current work.
+- **Battery indication and automatic power-off.**
 
 ## Install ORBIT
 
@@ -283,7 +284,7 @@ Record notes and effects in separate passes.
 
 | Session settings | Original demo songs |
 |---|---|
-| <img src="docs/images/settings.png" alt="Session settings with tap tempo, volume, key, mood and demos" width="240"> | <img src="docs/images/demos.png" alt="Original demo songs Iron, Sunlit and Velvet" width="240"> |
+| <img src="docs/images/settings.png" alt="Session settings with tap tempo, volume, key, mood, demos and saved songs" width="240"> | <img src="docs/images/demos.png" alt="Original demo songs Six Seven, Iron and Sunlit" width="240"> |
 
 Tap the top-right battery/status area to open **SESSION**.
 Use **SPEED (BPM)** +/-, or tap the number in time with your beat.
@@ -291,14 +292,16 @@ Use **SPEED (BPM)** +/-, or tap the number in time with your beat.
 BRIGHT is major pentatonic, DREAMY is minor pentatonic, and MOODY is natural minor.
 
 Open **DEMOS**, browse with **< / >**, choose a song, and confirm **LOAD DEMO**.
-There are three large cards on each of four pages.
-**Iron** is first and is ready to play on a fresh install, with Saw Stack on
-MELODY. If you already have a saved session, ORBIT restores that instead.
+There are up to three large cards on each of five pages.
+**Six Seven** is first and is ready to play on a fresh install, with a trumpet
+melody, tuba bass and a two-second voice sound. If you already have a saved
+session, ORBIT restores that instead.
 
-<img src="docs/images/demos-retro.png" alt="Original retro dance demos Disco Glow, Neon Heart and Saturday" width="240">
+<img src="docs/images/demos-retro.png" alt="Original demo songs Firefly, Disco Glow and Neon Heart" width="240">
 
 | Demo | BPM | Style |
 |---|---:|---|
+| Six Seven | 116 | Brass and voice |
 | Iron | 138 | Heavy synth, with Saw Stack melody |
 | Sunlit | 100 | Acoustic pop |
 | Velvet | 112 | Swung jazz |
@@ -312,8 +315,9 @@ MELODY. If you already have a saved session, ORBIT restores that instead.
 | Neon Heart | 120 | Synth-funk |
 | Saturday | 118 | Retro dance-pop |
 
-Each includes all four tracks, four arranged scenes and its own expressive vocal
-phrase. These are **original compositions**, not covers.
+Each includes all four tracks, four arranged scenes and its own voice sound.
+These are **original compositions**, not covers. Loading a demo keeps your
+current master volume.
 
 > Loading a demo replaces the current loops, scenes, sound choices, key, tempo and
 > microphone sample. Master volume is kept. Browsing or cancelling changes none
@@ -334,7 +338,28 @@ Do not hold BOOT while powering on unless you intend to enter the ESP32 download
 
 ORBIT saves your session automatically after stopping and leaving the controls
 idle. Wait for **SESSION SAVED** before powering off. The last session returns on
-the next boot; there is no separate Save button.
+the next boot. Automatic saving does not replace your saved song slots.
+
+### Save and load songs
+
+| Your saved songs | Save or load a slot |
+|---|---|
+| <img src="docs/images/songs.png" alt="Eight-slot song library showing Song 1 saved and three empty slots on the first page" width="240"> | <img src="docs/images/song-options.png" alt="Song 1 with replace and load buttons" width="240"> |
+
+Stop the music, let the sound fade, then open **SESSION > SONGS** (or
+**EXPLORE > SETTINGS > SONGS**). There are **eight slots**, labeled SONG 1–8;
+use **< / >** to see the other four.
+
+Choose a slot and tap **SAVE CURRENT SONG**. A saved song includes all four scenes,
+tracks, sounds, tempo, key, volume, recorded effects and your microphone recording.
+Wait for **SONG SAVED** before powering off. To update an occupied slot, tap
+**REPLACE WITH CURRENT SONG**, then confirm **REPLACE**. Other slots are unchanged.
+
+To return to a song, choose its slot, tap **LOAD THIS SONG**, then confirm **LOAD**.
+It opens stopped; press **PLAY** when ready. Loading replaces your current music
+and microphone recording and cannot be undone, so save your current work into
+another slot first if you want to keep it. Cancelling leaves everything unchanged.
+If loading fails, your current song and recording stay intact.
 
 ORBIT turns off completely after **45 seconds** of stopped inactivity. A countdown
 appears for the **last 15 seconds**; touch the screen or press a button to keep

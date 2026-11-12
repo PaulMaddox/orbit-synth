@@ -1,5 +1,6 @@
 #include "../Orbit/engine.h"
 #include "../Orbit/audio_input.h"
+#include "../Orbit/demo_sample.h"
 #include "../Orbit/screen_idle.h"
 #include "../Orbit/ui_layout.h"
 #include "../Orbit/touch_gesture.h"
@@ -203,7 +204,27 @@ int main() {
     assert(Engine::midiNote(0, 1, 0, 0) == 63);
     assert(Engine::midiNote(1, 0, 0, 0) == 48);
 
-    engine->loadDemo();
+    assert(engine->loadDemo() == Result::Ok);
+    assert(std::strcmp(DemoLibrary[0].name, "IRON") == 0);
+    assert(engine->session.bpm == 138 && engine->session.root == 2 && engine->session.scale == 0);
+    assert(engine->session.tracks[0].patch == 17 && engine->session.tracks[0].pitch == -12);
+    for (const Scene &scene : engine->session.scenes) {
+        assert(scene.tracks[0].patch == 17 && scene.tracks[0].pitch == -12);
+    }
+    assert(engine->session.sampleCount == DemoVoices[5].count);
+    assert(std::equal(engine->sample, engine->sample + engine->session.sampleCount, DemoVoices[5].samples));
+    {
+        auto nextDemo = std::make_unique<Engine>();
+        assert(nextDemo->loadDemo(1) == Result::Ok);
+        assert(std::strcmp(DemoLibrary[1].name, "SUNLIT") == 0);
+        assert(nextDemo->session.bpm == 100 && nextDemo->session.root == 0 && nextDemo->session.scale == 1);
+        assert(nextDemo->session.tracks[0].patch == 0);
+        assert(nextDemo->session.sampleCount == DemoVoices[0].count);
+        assert(std::equal(nextDemo->sample, nextDemo->sample + nextDemo->session.sampleCount,
+            DemoVoices[0].samples));
+    }
+    // Keep the existing capture/tail timing fixture on its acoustic-pop arrangement.
+    assert(engine->loadDemo(1) == Result::Ok);
     const uint16_t demoLeadCount = engine->session.tracks[0].count;
     engine->setBpm(110);
     engine->setSwing(0);

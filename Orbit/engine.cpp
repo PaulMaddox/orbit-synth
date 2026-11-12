@@ -46,18 +46,18 @@ int32_t bandlimitedSaw(uint32_t phase, uint32_t increment) {
 }
 
 const DemoInfo DemoLibrary[DemoCount] = {
-    {"SUNLIT", "ACOUSTIC POP", 100},
-    {"VELVET", "LATE-NIGHT JAZZ", 112},
-    {"STARDUST", "CINEMATIC", 86},
-    {"TUBA PARADE", "BRASS BAND", 116},
-    {"NEON", "EUPHORIC CLUB", 126},
-    {"IRON", "HEAVY GUITAR", 138},
-    {"OPEN ROAD", "ACOUSTIC POP", 108},
-    {"SEASIDE", "ACOUSTIC POP", 98},
-    {"FIREFLY", "ACOUSTIC POP", 92},
-    {"DISCO GLOW", "SUNSHINE DISCO", 116},
-    {"NEON HEART", "80S SYNTH-FUNK", 120},
-    {"SATURDAY", "RETRO DANCE-POP", 118},
+    {"IRON", "HEAVY SYNTH", 138, 5},
+    {"SUNLIT", "ACOUSTIC POP", 100, 0},
+    {"VELVET", "LATE-NIGHT JAZZ", 112, 1},
+    {"STARDUST", "CINEMATIC", 86, 2},
+    {"TUBA PARADE", "BRASS BAND", 116, 3},
+    {"NEON", "EUPHORIC CLUB", 126, 4},
+    {"OPEN ROAD", "ACOUSTIC POP", 108, 6},
+    {"SEASIDE", "ACOUSTIC POP", 98, 7},
+    {"FIREFLY", "ACOUSTIC POP", 92, 8},
+    {"DISCO GLOW", "SUNSHINE DISCO", 116, 9},
+    {"NEON HEART", "80S SYNTH-FUNK", 120, 10},
+    {"SATURDAY", "RETRO DANCE-POP", 118, 11},
 };
 const char *const SceneNames[SceneCount] = {"INTRO", "GROOVE", "BREAK", "DROP"};
 
@@ -656,6 +656,8 @@ Result Engine::loadDemo(int demo) {
     std::memset(fxDelay_, 0, sizeof(fxDelay_));
     selected_ = 0;
     session.bpm = DemoLibrary[demo].bpm;
+    // Keep composition and generated vocal IDs stable when reordering the picker.
+    demo = DemoLibrary[demo].arrangement;
     constexpr uint8_t roots[] = {0, 2, 7, 5, 0, 2, 7, 2, 0, 0, 9, 5};
     constexpr uint8_t lead[] = {0, 10, 15, 11, 17, 4};
     constexpr uint8_t bass[] = {22, 22, 14, 28, 21, 23};
@@ -687,7 +689,8 @@ Result Engine::loadDemo(int demo) {
             n = Note{uint16_t(step * TicksPerStep), uint16_t(length * TicksPerStep),
                      uint8_t(pad), uint8_t(velocity)};
         };
-        scene.tracks[0].patch = quiet ? intimate[demo] : intro ? alternate[demo] : lead[demo];
+        scene.tracks[0].patch = demo == 5 ? 17 :
+            quiet ? intimate[demo] : intro ? alternate[demo] : lead[demo];
         scene.tracks[1].patch = quiet && demo == 3 ? 13 : bass[demo];
         scene.tracks[0].tone = 92;
         scene.tracks[0].space = demo == 2 ? 34 : demo >= 4 ? 20 : 10;

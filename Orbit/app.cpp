@@ -33,7 +33,7 @@ constexpr uint16_t WHITE = 0xef7d, DIM = 0x8493, CYAN = 0x4f19;
 constexpr uint16_t CORAL = 0xfbaf, AMBER = 0xfdec, PURPLE = 0xbb9f;
 const uint16_t accents[] = {CYAN, AMBER, PURPLE, CORAL};
 const uint16_t demoAccents[DemoCount] = {
-    AMBER, PURPLE, CYAN, CORAL, CYAN, CORAL, AMBER, CYAN, AMBER, CORAL, PURPLE, CYAN
+    CORAL, AMBER, PURPLE, CYAN, CORAL, CYAN, AMBER, CYAN, AMBER, CORAL, PURPLE, CYAN
 };
 const char *trackNames[] = {"MELODY", "BASS", "BEATS", "VOICE"};
 const char *drumNames[] = {"KICK", "SNARE", "HAT", "OPEN", "CLAP", "TOM", "SHAKE", "RIM"};
@@ -1874,7 +1874,7 @@ void setup() {
     if (firstRun) toast("PRESS PLAY TO HEAR THE DEMO", 5000);
     if (!board::micAvailable()) toast("MIC UNAVAILABLE - SYNTH READY", 5000);
     screenIdle.activity(millis());
-    Serial.printf("ORBIT_READY version=3.2.2 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
+    Serial.printf("ORBIT_READY version=3.2.3 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
         board::micAvailable(), storageOk, ESP.getFreeHeap());
 }
 

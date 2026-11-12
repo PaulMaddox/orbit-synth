@@ -24,6 +24,10 @@ details here and update the user guide and screenshots when behavior changes.
   keyboard samples. Tuba is an intentional first-class instrument.
 - All demos are original compositions; style inspiration is not permission to
   reproduce someone else's melody, lyrics or arrangement.
+- IRON is picker/serial demo 1 and the fresh-install fallback, with Saw Stack
+  (17) on MELODY in every scene. Existing valid saved sessions still restore.
+  `DemoInfo::arrangement` maps presentation order to stable composition/vocal-bank
+  IDs; do not reorder generated voices or change other songs when moving a card.
 - Development/test songs, tracks and microphone content are disposable. Do not
   spend time making backups or reverse-engineering restoration of test music.
   **Keep the product's ordinary save, undo and confirmation behavior.**

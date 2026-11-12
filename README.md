@@ -277,7 +277,7 @@ Record notes and effects in separate passes.
 
 | Session settings | Original demo songs |
 |---|---|
-| <img src="docs/images/settings.png" alt="Session settings with tap tempo, volume, key, mood and demos" width="240"> | <img src="docs/images/demos.png" alt="Original acoustic-pop demo songs Open Road, Seaside and Firefly" width="240"> |
+| <img src="docs/images/settings.png" alt="Session settings with tap tempo, volume, key, mood and demos" width="240"> | <img src="docs/images/demos.png" alt="Original demo songs Iron, Sunlit and Velvet" width="240"> |
 
 Tap the top-right battery/status area to open **SESSION**.
 Use **SPEED (BPM)** +/-, or tap the number in time with your beat.
@@ -286,17 +286,19 @@ BRIGHT is major pentatonic, DREAMY is minor pentatonic, and MOODY is natural min
 
 Open **DEMOS**, browse with **< / >**, choose a song, and confirm **LOAD DEMO**.
 There are three large cards on each of four pages.
+**Iron** is first and is ready to play on a fresh install, with Saw Stack on
+MELODY. If you already have a saved session, ORBIT restores that instead.
 
 <img src="docs/images/demos-retro.png" alt="Original retro dance demos Disco Glow, Neon Heart and Saturday" width="240">
 
 | Demo | BPM | Style |
 |---|---:|---|
+| Iron | 138 | Heavy synth, with Saw Stack melody |
 | Sunlit | 100 | Acoustic pop |
 | Velvet | 112 | Swung jazz |
 | Stardust | 86 | Cinematic |
 | Tuba Parade | 116 | Brass band, including tuba bass and a tuba melody |
 | Neon | 126 | Electronic club |
-| Iron | 138 | Heavy guitar |
 | Open Road | 108 | Driving acoustic pop |
 | Seaside | 98 | Syncopated acoustic pop |
 | Firefly | 92 | Gentle piano, guitar and harp pop |

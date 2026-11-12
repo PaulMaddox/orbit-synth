@@ -22,6 +22,7 @@ struct DemoInfo {
     const char *name;
     const char *style;
     uint16_t bpm;
+    uint8_t arrangement;
 };
 extern const DemoInfo DemoLibrary[DemoCount];
 

@@ -18,6 +18,10 @@ constexpr Rect BackTouch{166, 8, 50, 26};
 constexpr Rect Footer[] = {{20, 237, 62, 31}, {89, 237, 62, 31}, {158, 237, 62, 31}};
 constexpr Rect FooterPair[] = {{20, 237, 96, 31}, {124, 237, 96, 31}};
 constexpr Rect FooterWide{20, 237, 200, 31};
+// Invisible footer targets include the surrounding padding, split without overlap.
+constexpr Rect FooterTouch[] = {{0, 232, 86, 52}, {86, 232, 69, 52}, {155, 232, 85, 52}};
+constexpr Rect FooterPairTouch[] = {{0, 232, 120, 52}, {120, 232, 120, 52}};
+constexpr Rect FooterWideTouch{0, 232, 240, 52};
 constexpr Rect SoundPrevious{8, 42, 42, 29};
 constexpr Rect SoundNext{190, 42, 42, 29};
 constexpr Rect SoundCards[] = {{8, 94, 108, 54}, {124, 94, 108, 54},

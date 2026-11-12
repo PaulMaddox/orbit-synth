@@ -5,11 +5,17 @@ details here and update the user guide and screenshots when behavior changes.
 
 ## Product rules
 
+- Keep README strictly user-facing: features, how to use the app, installation
+  and practical troubleshooting. Put implementation details and engineering
+  explanations in AGENTS.md, not the user guide.
 - Design for **beginners across the entire app**, not just the sound picker.
   Prefer ordinary words, large targets, short flows, safe previews and undo.
 - Portrait, 240 x 284. Preserve the rounded-screen safe areas: header sides 24 px,
   footer sides 20 px, footer bottom 16 px. `ui_layout.h` is the shared source of
   truth for drawing/hit targets; native tests check conservative corner safety.
+  Keep the visible footers inside those safe margins, but use `FooterTouch`,
+  `FooterPairTouch` and `FooterWideTouch` for input. These cover the full bottom
+  strip (y=232..283) including side/bottom padding, partitioned without overlaps.
 - MELODY/BASS use **automatic tap or hold**. Do not reintroduce a per-sound
   Play Whole/Hold selector. Drums, microphone recordings and pieces are one-shots.
 - Keep sounds recognizable and genuinely distinct. Twenty-one instruments use
@@ -36,6 +42,7 @@ details here and update the user guide and screenshots when behavior changes.
 | `Orbit/board.h`, `board.cpp` | I2C peripherals, power, codecs, I2S and touch |
 | `Orbit/audio_input.h` | Verified microphone word layout |
 | `Orbit/ui_layout.h` | Shared touch/drawing rectangles |
+| `Orbit/touch_gesture.h` | Testable press/movement/hold recognition; ordinary button holds remain taps |
 | `Orbit/screen_idle.h` | Display inactivity and wake handling |
 | `Orbit/sound_presets.h` | Sound definitions and family API |
 | `Orbit/sample_bank.h`, `sample_bank.cpp`, `sample_bank_lookup.cpp` | Generated recordings/FIR tables, register folding and sample lookup |
@@ -341,6 +348,24 @@ playback is not a substitute for that stress test.
 - Screen sleep is display/backlight only after 60 stopped seconds. Performance,
   recording, count-in and capture keep it awake. Consume the entire waking gesture,
   including a BOOT hold/release, so it cannot accidentally record or play.
+
+### Touch reliability
+
+- The original visible footer rectangles were fully clickable, but only 31 px
+  tall. Input now covers their surrounding bottom padding too, without changing
+  drawing or overlapping controls above y=232. Use the shared touch rectangles
+  for three-button, two-button and full-width footer variants on every page.
+- `TouchGesture::takeHold` consumes a gesture only when an actual hold action
+  is eligible: a Play track tab or a Mixer row. An older global hold flag was
+  set after 650 ms on every control, silently discarding ordinary longer presses.
+  Keep ordinary button holds actionable on release; keep real hold actions
+  single-shot and prevent an additional release tap afterward.
+- Preserve musical pad note-on/off, FX/slider dragging, wake suppression and the
+  existing movement tolerances (14 px for holds; 24 px for taps). Do not invent
+  touch-coordinate calibration offsets without physical measurements.
+- Native regressions check every drawn footer pixel, every expanded target pixel,
+  non-overlap/upper-control boundaries and short/long/consumed/moved/wraparound
+  gestures. Serial `tap` verifies dispatch only, not the physical touch controller.
 
 ## Persistence and flash layout
 

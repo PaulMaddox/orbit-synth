@@ -2,6 +2,7 @@
 #include "../Orbit/audio_input.h"
 #include "../Orbit/screen_idle.h"
 #include "../Orbit/ui_layout.h"
+#include "../Orbit/touch_gesture.h"
 #include "sound_loudness.h"
 
 #include <algorithm>
@@ -80,6 +81,27 @@ void assertCornerSafe(const ui::Rect &rect) {
         }
     }
 }
+
+template <size_t N>
+void assertFooterCoverage(const ui::Rect (&buttons)[N], const ui::Rect (&targets)[N]) {
+    for (size_t i = 0; i < N; ++i) {
+        const auto &button = buttons[i];
+        for (int y = button.y; y < button.y + button.h; ++y)
+            for (int x = button.x; x < button.x + button.w; ++x)
+                assert(ui::hit(targets, x, y) == int(i));
+    }
+    for (int x = 0; x < 240; ++x) {
+        assert(ui::hit(targets, x, 231) == -1);
+        assert(ui::hit(targets, x, 284) == -1);
+        for (int y = 232; y < 284; ++y) {
+            int matches = 0;
+            for (const auto &target : targets) matches += target.contains(x, y);
+            assert(matches == 1);
+        }
+    }
+    assert(ui::hit(targets, -1, 252) == -1);
+    assert(ui::hit(targets, 240, 252) == -1);
+}
 }
 
 int main() {
@@ -100,6 +122,46 @@ int main() {
     assert(ui::hit(ui::Footer, 10, 271) == -1);
     assert(ui::hit(ui::FooterPair, 25, 264) == 0);
     assert(ui::hit(ui::FooterPair, 218, 264) == 1);
+    assertFooterCoverage(ui::Footer, ui::FooterTouch);
+    assertFooterCoverage(ui::FooterPair, ui::FooterPairTouch);
+    const ui::Rect wideButton[] = {ui::FooterWide}, wideTarget[] = {ui::FooterWideTouch};
+    assertFooterCoverage(wideButton, wideTarget);
+    for (const auto &button : ui::Footer) {
+        for (int x : {button.x, button.x + button.w - 1}) {
+            for (int y : {button.y, button.y + button.h - 1}) {
+                for (uint32_t duration : {100u, 649u, 650u, 651u, 1000u, 2500u}) {
+                    ui::TouchGesture press;
+                    press.begin(x, y, 100);
+                    press.move(x + 2, y - 2);
+                    assert(!press.takeHold(100 + duration, false));
+                    assert(press.tapped());
+                    assert(ui::hit(ui::FooterTouch, press.x(), press.y()) ==
+                        ui::hit(ui::Footer, x, y));
+                }
+            }
+        }
+    }
+    ui::TouchGesture hold;
+    hold.begin(30, 50, 100);
+    assert(!hold.takeHold(750, true));
+    assert(hold.takeHold(751, true));
+    assert(!hold.takeHold(1200, true));
+    assert(!hold.tapped());
+    hold.begin(30, 252, 100);
+    hold.move(53, 275);
+    assert(!hold.takeHold(1100, false));
+    assert(hold.tapped());
+    hold.move(54, 275);
+    assert(!hold.tapped());
+    hold.begin(30, 50, 100);
+    hold.move(44, 50);
+    assert(!hold.takeHold(1100, true));
+    assert(hold.tapped());
+    hold.begin(30, 252, UINT32_MAX - 400);
+    assert(!hold.takeHold(400, false));
+    assert(hold.tapped());
+    assert(hold.takeHold(400, true));
+    assert(!hold.tapped());
     assert(ui::HeaderStatus.contains(ui::HeaderRight, 17));
     assertCornerSafe(ui::Navigation);
     for (const auto &rect : ui::MenuCards) assertCornerSafe(rect);

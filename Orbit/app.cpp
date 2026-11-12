@@ -17,6 +17,7 @@
 #include "audio_input.h"
 #include "screen_idle.h"
 #include "ui_layout.h"
+#include "touch_gesture.h"
 
 using namespace orbit;
 namespace {
@@ -43,9 +44,10 @@ Page page = Play, returnPage = Mixer;
 Page menuReturn = Play;
 Confirmation confirmation = ClearTrack;
 bool dirty = true, storageOk = false, firstRun = false;
-bool touchDown = false, suppressTouch = false, holdHandled = false;
-int touchX = 0, touchY = 0, heldPad = -1;
-uint32_t touchStart = 0, lastTouchRead = 0, lastPowerRead = 0, lastDraw = 0;
+bool touchDown = false, suppressTouch = false;
+ui::TouchGesture touchGesture;
+int heldPad = -1;
+uint32_t lastTouchRead = 0, lastPowerRead = 0, lastDraw = 0;
 uint32_t lastEdit = 0, savedRevision = 0, lastHealth = 0;
 uint32_t recordChoiceUntil = 0;
 int recordChoiceSeconds = 3;
@@ -68,7 +70,6 @@ struct SpeakerMeter {
 std::atomic<uint32_t> referenceHz{0};
 int16_t referenceWave[256]{};
 uint32_t touchErrors = 0;
-int lastTouchX = 0, lastTouchY = 0;
 char toastText[48] = "";
 uint32_t toastUntil = 0;
 Status shown;
@@ -877,8 +878,8 @@ void tapTempo() {
 
 void handleTap(int x, int y) {
     Status s = snapshot();
-    int footer = ui::hit(ui::Footer, x, y);
-    int pair = ui::hit(ui::FooterPair, x, y);
+    int footer = ui::hit(ui::FooterTouch, x, y);
+    int pair = ui::hit(ui::FooterPairTouch, x, y);
     if (page == Confirm) {
         if (confirmation == CopySection || confirmation == ReplaceMoves) {
             if (pair == 0) switchPage(returnPage);
@@ -921,7 +922,7 @@ void handleTap(int x, int y) {
         return;
     }
     if (page == Menu) {
-        if (ui::BackTouch.contains(x, y) || ui::FooterWide.contains(x, y)) switchPage(menuReturn);
+        if (ui::BackTouch.contains(x, y) || ui::FooterWideTouch.contains(x, y)) switchPage(menuReturn);
         else {
             int card = ui::hit(ui::MenuCards, x, y);
             const Page targets[] = {Play, Mixer, Scenes, Slices, LiveFx, Settings};
@@ -931,7 +932,7 @@ void handleTap(int x, int y) {
     }
     if (page == SceneCopy) {
         int card = ui::hit(ui::SceneCards, x, y);
-        if (ui::BackTouch.contains(x, y) || ui::FooterWide.contains(x, y)) switchPage(Scenes);
+        if (ui::BackTouch.contains(x, y) || ui::FooterWideTouch.contains(x, y)) switchPage(Scenes);
         else if (card >= 0) {
             if (card == s.scene) { toast("THIS IS THE CURRENT SECTION"); return; }
             pendingScene = card;
@@ -961,7 +962,7 @@ void handleTap(int x, int y) {
         return;
     }
     if (page == FxOptions) {
-        if (ui::BackTouch.contains(x, y) || ui::FooterWide.contains(x, y)) switchPage(LiveFx);
+        if (ui::BackTouch.contains(x, y) || ui::FooterWideTouch.contains(x, y)) switchPage(LiveFx);
         else {
             int control = ui::hit(ui::FxOptions, x, y);
             Result result = Result::Ok;
@@ -1110,14 +1111,14 @@ void handleDrag(int x, int y) {
     if (page == Sound && y >= 138 && y <= 224) {
         int value = constrain((x - 12) * 100 / 216, 0, 100);
         Lock lock;
-        if (touchY < 182)
+        if (touchGesture.y() < 182)
             engine.setPitch(constrain(((x - 16) * 24 + 104) / 208 - 12, -12, 12));
         else engine.setSpace(value);
         dirty = true;
-    } else if (page == Settings && touchY >= 120 && touchY <= 158) {
+    } else if (page == Settings && touchGesture.y() >= 120 && touchGesture.y() <= 158) {
         int value = constrain(((x - 16) * 80 + 104) / 208, 0, 80);
         Lock lock; engine.setVolume(value); dirty = true;
-    } else if (page == LiveFx && ui::FxPad.contains(touchX, touchY)) {
+    } else if (page == LiveFx && ui::FxPad.contains(touchGesture.x(), touchGesture.y())) {
         if (ui::FxPad.contains(x, y)) {
             Lock lock;
             report(engine.touchFx(constrain((x - ui::FxPad.x) * 100 / (ui::FxPad.w - 1), 0, 100),
@@ -1167,8 +1168,7 @@ void pollTouch() {
     }
     if (down && !touchDown) {
         touchDown = true;
-        touchX = x; touchY = y; touchStart = now; holdHandled = false;
-        lastTouchX = x; lastTouchY = y;
+        touchGesture.begin(x, y, now);
         if (page == Confirm && confirmation == RecordTrack) {
             handleTap(x, y);
             suppressTouch = true;
@@ -1185,20 +1185,21 @@ void pollTouch() {
         }
         handleDrag(x, y);
     } else if (down && touchDown) {
-        lastTouchX = x; lastTouchY = y;
+        touchGesture.move(x, y);
         handleDrag(x, y);
-        if (!holdHandled && now - touchStart > 650 &&
-            abs(x - touchX) < 14 && abs(y - touchY) < 14) {
-            holdHandled = true;
-            if (page == Play && touchY >= 41 && touchY < 74) {
+        bool soundHold = page == Play && touchGesture.y() >= 41 && touchGesture.y() < 74;
+        bool clearHold = page == Mixer && touchGesture.y() >= 41 &&
+            touchGesture.y() < 225 && touchGesture.x() < 158;
+        if (touchGesture.takeHold(now, soundHold || clearHold)) {
+            if (soundHold) {
                 Result result;
-                { Lock lock; result = engine.select(std::max(0, std::min(3, (touchX - 8) / 57))); }
+                { Lock lock; result = engine.select(std::max(0, std::min(3, (touchGesture.x() - 8) / 57))); }
                 report(result);
                 if (result == Result::Ok) switchPage(Sound);
                 suppressTouch = true;
-            } else if (page == Mixer && touchY >= 41 && touchY < 225 && touchX < 158) {
+            } else {
                 Result result;
-                { Lock lock; result = engine.select((touchY - 41) / 46); }
+                { Lock lock; result = engine.select((touchGesture.y() - 41) / 46); }
                 report(result);
                 if (result == Result::Ok) {
                     confirmation = ClearTrack; returnPage = Mixer; switchPage(Confirm);
@@ -1211,8 +1212,7 @@ void pollTouch() {
         { Lock lock; engine.noteOff(); engine.releaseFx(); }
         heldPad = -1;
         touchDown = false;
-        if (!holdHandled && !wasPad && abs(lastTouchX - touchX) < 24 && abs(lastTouchY - touchY) < 24)
-            handleTap(touchX, touchY);
+        if (!wasPad && touchGesture.tapped()) handleTap(touchGesture.x(), touchGesture.y());
     }
 }
 
@@ -1776,7 +1776,7 @@ void setup() {
     if (firstRun) toast("PRESS PLAY TO HEAR THE DEMO", 5000);
     if (!board::micAvailable()) toast("MIC UNAVAILABLE - SYNTH READY", 5000);
     screenIdle.activity(millis());
-    Serial.printf("ORBIT_READY version=3.2 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
+    Serial.printf("ORBIT_READY version=3.2.1 display=240x284 sample_rate=16000 mic=%d storage=%d heap=%u\n",
         board::micAvailable(), storageOk, ESP.getFreeHeap());
 }
 

@@ -44,7 +44,8 @@ redistributing a recording bank or firmware. No source author's endorsement is i
 
 ## Original material
 
-Electronic presets, demo compositions and vocal phrases are original ORBIT
-material. Demo speech was synthesized locally with Windows David, Hazel and Zira
-voices using expressive SSML. No user's microphone recording or proprietary
-keyboard factory sample is included.
+Electronic presets and demo compositions are original ORBIT material.
+Twelve demo vocal phrases were synthesized locally with Windows David, Hazel
+and Zira voices using expressive SSML. Six Seven uses its supplied, approved
+non-personal two-second demo recording, preserved without resynthesis.
+No personal recordings or proprietary keyboard factory samples are included.

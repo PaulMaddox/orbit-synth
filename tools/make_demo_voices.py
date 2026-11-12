@@ -1,4 +1,5 @@
 """Generate original, expressive demo phrases locally with Windows speech synthesis."""
+import argparse
 import pathlib
 import subprocess
 import tempfile
@@ -24,14 +25,20 @@ PHRASES = [
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--encode-only", action="store_true",
+                        help="Use the checked-in WAVs without resynthesizing any voices")
+    args = parser.parse_args()
     assets = ROOT / "tools" / "demo-voices"
     assets.mkdir(exist_ok=True)
-    cpp = ['// Original locally synthesized phrases; tools/make_demo_voices.py.',
+    cpp = ['// Original demo phrases; tools/make_demo_voices.py.',
            '#include "demo_sample.h"', 'namespace orbit {',
-           f'static_assert(DemoCount == {len(PHRASES)}, "Regenerate the demo voice bank");']
+           f'static_assert(DemoCount == {len(PHRASES) + 1}, "Regenerate the demo voice bank");']
     descriptions = []
     with tempfile.TemporaryDirectory() as temporary:
         for index, (voice, phrase) in enumerate(PHRASES):
+            if args.encode_only:
+                continue
             output = assets / f"{index + 1}.wav"
             ssml = (f'<speak version="1.0" xml:lang="en-US"><voice name="{voice}">'
                     f'<prosody rate="+25%">{phrase}</prosody></voice></speak>')
@@ -62,12 +69,19 @@ def main():
             audio[-80:] *= np.linspace(1, 0, 80)
             samples = np.rint(audio * 32767).astype(np.int16)
             sf.write(output, samples, rate, subtype="PCM_16")
-            cpp.append(f"const int16_t DemoVocal{index}[] = {{")
-            cpp.extend("    " + ",".join(map(str, samples[i:i + 16])) + ","
-                       for i in range(0, len(samples), 16))
-            cpp.append("};")
-            descriptions.append(f"    {{DemoVocal{index}, {len(samples)}}},")
             print(f"Phrase {index + 1}: {len(samples) / rate:.2f} seconds")
+    sources = [assets / f"{index + 1}.wav" for index in range(len(PHRASES))]
+    sources.append(assets / "six-seven.wav")
+    for index, source in enumerate(sources):
+        samples, rate = sf.read(source, dtype="int16")
+        limit = 32000 if index == len(PHRASES) else 20000
+        if rate != 16000 or samples.ndim != 1 or not 0 < len(samples) <= limit:
+            raise ValueError(f"Incorrect demo voice format or length: {source}")
+        cpp.append(f"const int16_t DemoVocal{index}[] = {{")
+        cpp.extend("    " + ",".join(map(str, samples[i:i + 16])) + ","
+                   for i in range(0, len(samples), 16))
+        cpp.append("};")
+        descriptions.append(f"    {{DemoVocal{index}, {len(samples)}}},")
     cpp.extend(["const DemoVoice DemoVoices[DemoCount] = {", *descriptions, "};", "}", ""])
     (ROOT / "Orbit" / "demo_sample.cpp").write_text("\n".join(cpp), encoding="ascii")
 

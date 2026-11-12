@@ -13,6 +13,7 @@
 *.exe
 /engine_test
 /tests/engine_test
+/tests/song_storage_test
 *.bin
 *.elf
 *.map

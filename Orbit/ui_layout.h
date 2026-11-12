@@ -33,6 +33,10 @@ constexpr Rect MenuCards[] = {{8, 44, 108, 50}, {124, 44, 108, 50},
 constexpr Rect SceneCards[] = {{8, 47, 108, 66}, {124, 47, 108, 66},
                               {8, 121, 108, 66}, {124, 121, 108, 66}};
 constexpr Rect SceneCopy{20, 195, 200, 28};
+constexpr Rect SongCards[] = {{8, 48, 108, 65}, {124, 48, 108, 65},
+                             {8, 121, 108, 65}, {124, 121, 108, 65}};
+constexpr Rect SongSave{8, 48, 224, 59};
+constexpr Rect SongLoad{8, 117, 224, 59};
 constexpr Rect FxPad{20, 73, 200, 135};
 constexpr Rect FxOptions[] = {{8, 44, 224, 45}, {8, 98, 224, 45},
                              {8, 152, 224, 45}};

@@ -41,7 +41,7 @@ device, not design mockups.
 - **13 original demos:** acoustic pop, jazz, cinematic, brass band, club,
   heavy guitar and bright retro dance styles.
 - **Eight saved songs**, plus automatic saving of your current work.
-- **Battery indication and screen sleep.**
+- **Battery indication and automatic power-off.**
 
 ## Install ORBIT
 
@@ -331,7 +331,8 @@ current master volume.
 | BOOT, hold | Undo / redo the last track take or clear |
 | PWR, short press | Play / stop |
 | PWR, long press | Board's hardware power-off |
-| Touch or button while asleep | Wake only; that first gesture does not play or record |
+| Touch or button during the power-off countdown | Cancel the countdown without playing or recording |
+| PWR while off | Turn ORBIT back on |
 
 Do not hold BOOT while powering on unless you intend to enter the ESP32 downloader.
 
@@ -360,11 +361,15 @@ and microphone recording and cannot be undone, so save your current work into
 another slot first if you want to keep it. Cancelling leaves everything unchanged.
 If loading fails, your current song and recording stay intact.
 
-The screen sleeps after **60 seconds** of stopped inactivity. Playing, recording
-and microphone capture keep it awake. Sleep reduces battery use while keeping
-your session ready. Touch the screen or press a button to wake it; that first
-gesture only wakes the device. Battery and USB indicators reflect actual hardware readings;
-USB-only operation does not invent a battery percentage.
+On battery power, ORBIT turns off completely after **45 seconds** of stopped
+inactivity. It stays on while plugged into USB. A countdown appears for the
+**last 15 seconds**; touch the screen or press a button to keep
+using it. Playing, recording and microphone capture prevent automatic power-off,
+and ORBIT waits for pending saves. **Press the power button to turn it back on
+at any time.** Your saved session returns when it starts.
+
+Battery and USB indicators reflect actual hardware readings; USB-only operation
+does not invent a battery percentage.
 
 ## Troubleshooting
 
@@ -377,7 +382,7 @@ USB-only operation does not invent a battery percentage.
 | Recording seems delayed | GET READY and PRACTICE each run for two full loops. Recording starts afterward; already-playing music first waits for a loop boundary. |
 | Voice is too short | Capture closer to the microphone and use FINISH RECORDING only after the sound. Maximum capture is two seconds. |
 | CAPTURE GLITCH | Stop playback, retry capture, and check USB power. |
-| Screen is dark | Touch once to wake. Check USB/battery power if it stays dark. |
+| Screen is dark | Press the power button to turn ORBIT on. Check USB/battery power if it stays dark. |
 | Build dependencies do not match | Run `python build.py --check` and install the exact versions listed above. |
 
 For serial diagnostics, sound-bank regeneration and feature development, see

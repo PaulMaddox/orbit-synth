@@ -4,8 +4,6 @@
 #include <atomic>
 #define XPOWERS_CHIP_AXP2101
 #include <XPowersLib.h>
-#include "driver/gpio.h"
-#include "esp_sleep.h"
 #include "es8311.h"
 #include "engine.h"
 #include "audio_input.h"
@@ -18,10 +16,8 @@ XPowersPMU power;
 const char *lastError = "";
 bool micOnline = false;
 es8311_handle_t codec = nullptr;
-bool txRunning = false, rxRunning = false, touchAutoSleep = false;
-std::atomic<bool> touchInterrupt{false};
+bool txRunning = false, rxRunning = false;
 std::atomic<uint32_t> droppedFrames{0};
-void IRAM_ATTR onTouch() { touchInterrupt.store(true, std::memory_order_relaxed); }
 bool IRAM_ATTR onRxOverflow(i2s_chan_handle_t, i2s_event_data_t *, void *) {
     droppedFrames.fetch_add(1, std::memory_order_relaxed);
     return false;
@@ -83,10 +79,6 @@ bool begin() {
     pinMode(0, OUTPUT);
     amplifier(false);
     pinMode(9, INPUT_PULLUP);
-    pinMode(11, INPUT_PULLUP);
-    attachInterrupt(11, onTouch, FALLING);
-    if (!check(gpio_wakeup_enable(GPIO_NUM_9, GPIO_INTR_LOW_LEVEL), "BOOT wake") ||
-        !check(esp_sleep_enable_gpio_wakeup(), "GPIO wake")) return false;
     if (!Wire.begin(7, 8, 400000)) { lastError = "I2C bus"; return false; }
     Wire.setTimeOut(15);
     if (!power.begin(Wire, AXP2101_SLAVE_ADDRESS, 7, 8)) {
@@ -136,13 +128,6 @@ bool begin() {
 }
 
 bool readTouch(int &x, int &y, bool &down) {
-    if (touchAutoSleep) {
-        // Standby touch may not answer I2C until its interrupt announces a touch.
-        if (!touchWakePending()) { down = false; return true; }
-        if (!write(0x15, 0xfe, 0xff)) return false;
-        touchAutoSleep = false;
-    }
-    touchInterrupt.exchange(false, std::memory_order_relaxed);
     Wire.beginTransmission(0x15);
     Wire.write(0x02);
     if (Wire.endTransmission(false) != 0 ||
@@ -154,70 +139,15 @@ bool readTouch(int &x, int &y, bool &down) {
     return true;
 }
 
-bool touchWakePending() {
-    return touchInterrupt.load(std::memory_order_relaxed) || digitalRead(11) == LOW;
-}
-
-esp_err_t lightSleep() {
-    // GPIO wake shares the interrupt type with the ordinary edge ISR. Mask that
-    // ISR while using level wake, then restore edges to avoid an interrupt storm.
-    if (!check(gpio_intr_disable(GPIO_NUM_11), "Touch interrupt suspend")) return ESP_FAIL;
-    esp_err_t result = gpio_wakeup_enable(GPIO_NUM_11, GPIO_INTR_LOW_LEVEL);
-    if (result == ESP_OK)
-        result = touchWakePending() ? ESP_ERR_SLEEP_REJECT : esp_light_sleep_start();
-    bool restored = check(gpio_wakeup_disable(GPIO_NUM_11), "Touch wake disable");
-    restored = check(gpio_set_intr_type(GPIO_NUM_11, GPIO_INTR_NEGEDGE), "Touch interrupt edge") && restored;
-    restored = check(gpio_intr_enable(GPIO_NUM_11), "Touch interrupt resume") && restored;
-    return restored ? result : ESP_FAIL;
-}
-
-bool suspendAudio() {
-    amplifier(false);
-    if (!touchAutoSleep) {
-        if (!write(0x15, 0xfe, 0x00)) return false;
-        touchAutoSleep = true;
+void powerOff() {
+    // Same documented shutdown bit as XPowersLib::shutdown, with checked I2C.
+    int config = power.readRegister(XPOWERS_AXP2101_COMMON_CONFIG);
+    if (config < 0 || !write(AXP2101_SLAVE_ADDRESS, XPOWERS_AXP2101_COMMON_CONFIG, config | 1)) {
+        Serial.println("POWER_OFF_ERROR PMU shutdown request");
+        return;
     }
-    // Espressif esp_codec_dev standby sequences; retain the shared peripheral rails.
-    constexpr uint8_t speakerOff[][2] = {
-        {0x32, 0x00}, {0x17, 0x00}, {0x0e, 0xff}, {0x12, 0x02},
-        {0x14, 0x00}, {0x0d, 0xfa}, {0x15, 0x00}, {0x02, 0x10},
-        {0x00, 0x00}, {0x00, 0x1f}, {0x01, 0x30}, {0x01, 0x00},
-        {0x45, 0x00}, {0x0d, 0xfc}, {0x02, 0x00}
-    };
-    constexpr uint8_t micOff[][2] = {
-        {0x47, 0xff}, {0x48, 0xff}, {0x49, 0xff}, {0x4a, 0xff},
-        {0x4b, 0xff}, {0x4c, 0xff}, {0x40, 0xc0}, {0x01, 0x7f}, {0x06, 0x07}
-    };
-    for (const auto &reg : speakerOff) if (!write(0x18, reg[0], reg[1])) return false;
-    if (micOnline)
-        for (const auto &reg : micOff) if (!write(0x40, reg[0], reg[1])) return false;
-    return setChannel(rx, rxRunning, false) && setChannel(tx, txRunning, false);
-}
-
-bool resumeAudio() {
-    amplifier(false);
-    if (!setChannel(rx, rxRunning, false) || !setChannel(tx, txRunning, false) ||
-        !initSpeaker()) return false;
-    if (micOnline && !initMic()) {
-        lastError = "Microphone resume";
-        Serial.println("HARDWARE_ERROR microphone resume");
-        return false;
-    }
-    if (!setChannel(tx, txRunning, true) || !setChannel(rx, rxRunning, true)) return false;
-    // Settle clocks and microphone input with the amplifier still physically off.
-    int32_t silence[128]{};
-    int16_t input[64 * orbit::InputFrameSamples];
-    for (int i = 0; i < 50; ++i) {
-        size_t written = 0, bytes = 0;
-        if (!check(i2s_channel_write(tx, silence, sizeof(silence), &written, 100), "I2S wake output") ||
-            !check(i2s_channel_read(rx, input, sizeof(input), &bytes, 100), "I2S wake input")) return false;
-        if (written != sizeof(silence) || bytes != sizeof(input)) {
-            lastError = "Short audio wake transfer";
-            Serial.printf("HARDWARE_ERROR audio wake bytes=%u,%u\n", unsigned(written), unsigned(bytes));
-            return false;
-        }
-    }
-    return true;
+    delay(1500);
+    Serial.println("POWER_OFF_ERROR PMU did not turn off");
 }
 
 bool powerPressed() {

@@ -50,7 +50,7 @@ details here and update the user guide and screenshots when behavior changes.
 | `Orbit/audio_input.h` | Verified microphone word layout |
 | `Orbit/ui_layout.h` | Shared touch/drawing rectangles |
 | `Orbit/touch_gesture.h` | Testable press/movement/hold recognition; ordinary button holds remain taps |
-| `Orbit/screen_idle.h` | Inactivity timing for touch-wake power saving |
+| `Orbit/screen_idle.h` | Wrap-safe inactivity timing and power-off countdown |
 | `Orbit/sound_presets.h` | Sound definitions and family API |
 | `Orbit/sample_bank.h`, `sample_bank.cpp`, `sample_bank_lookup.cpp` | Generated recordings/FIR tables, register folding and sample lookup |
 | `Orbit/sound_levels.h` | Generated per-role/note/tone Q12 gains |
@@ -69,7 +69,7 @@ details here and update the user guide and screenshots when behavior changes.
 | `tests/engine_test.cpp` | Native behavior/audio/layout regressions |
 | `tests/sound_loudness.h`, `speaker_adjustments.h` | Measured speaker response and empirical residual corrections |
 | `tests/speaker_levels_test.py`, `sound_performance_test.py`, `capture_test.py` | Hardware checks |
-| `tests/sleep_test.py` | Inaudible USB sleep/resume and session-preservation check |
+| `tests/power_off_test.py` | Inaudible USB automatic-power-off inhibition check |
 | `build.py`, `requirements.txt` | Portable discovery of the pinned Arduino toolchain; build/install/update |
 | `tools/requirements.txt` | Optional asset-generation, calibration and screenshot dependencies |
 | `docs/images/` | Current firmware screenshots used by README |
@@ -367,41 +367,37 @@ playback is not a substitute for that stress test.
 - FX has 64 points/loop, smoothed filter/echo changes, recording/undo and live override.
   Release on page changes, touch-read failure and hardware STOP to prevent stuck FX.
   Do not let a recorded movement overwrite notes or instrument settings.
-- After 60 stopped, idle seconds, sleep the LCD controller and backlight, suspend
-  ES8311/ES7210 and their analog sections, disable the amplifier and both I2S
-  channels, and pause the audio task cooperatively between complete blocks.
-  Never suspend a task while it might own the engine mutex or use I2S. Resume
-  codecs with the verified initialization (including ES7210 `0x08=0x10`), settle
-  200 ms of duplex silence with the amplifier disabled, then resume the task.
-  Performance, preparation, capture, voices/echo tails, live touches, diagnostics
-  and pending saves prevent sleep. RAM/session/undo survive without a reload.
-  Consume the entire waking gesture, including BOOT hold/release.
-- On verified battery-only power, use explicit ESP32-C6 light sleep with active-low
-  touch IRQ 11 and BOOT 9 wake. A 250 ms timer polls the I2C-only PWR key and USB
-  insertion. Leave flash power policy at the SDK default; do not force flash off
-  during asynchronous touch wake. Keep charging and all PMU rails unchanged.
-- Never enter CPU light sleep while USB power is present or power status is
-  invalid: IDF 5.5 warns that clock-gating USB Serial/JTAG can break the host
-  connection. Peripheral/audio standby still applies on USB, with slow polling
-  and responsive serial diagnostics. A missing terminal is not proof of no USB.
-- CST816D `0xfe=0x00` permits automatic low-power touch scanning during sleep;
-  do not use its reset-only deep-sleep command. Avoid polling its I2C while in
-  standby. Restore `0xfe=0xff` on the next touch IRQ before reading coordinates;
-  this may be deferred after BOOT/PWR wake until the first actual touch.
-  Capture touch edges in an ISR so quick taps still wake on USB. GPIO wake shares
-  the interrupt-type register: mask the edge ISR around light sleep, select low
-  level wake, then disable that wake and restore falling edges before re-enabling
-  the ISR. Leaving the ISR enabled in level mode can cause an interrupt storm.
-- Status adds `audio_sleep`, `light_sleeps`, `light_sleep_us` and `sleep_error`.
-  `status` and `fingerprint` do not wake the device; other serial commands do.
-  `py tests\sleep_test.py --port COM4` checks real USB standby/resume and session
-  preservation without making sound. Battery light sleep and physical touch wake
-  additionally require an unplugged battery-powered board; do not infer them
-  from serial `wake` or claim battery life without current measurements.
-  ORBIT 3.2.2 passed two USB standby/resume cycles and an unplugged physical
-  touch wake with no accidental play/record. Counters confirmed actual CPU light
-  sleep; audio/capture errors stayed zero, and post-wake microphone input had no
-  zero-filled frames. Battery current/lifetime has not been measured.
+- After 45 stopped, idle seconds on verified battery-only power, request the
+  AXP2101's documented shutdown (COMMON_CONFIG bit 0, as used by
+  XPowersLib::shutdown). Check the I2C read/write;
+  preserve other bits, charging settings and rail configuration. This replaces
+  screen/audio standby and CPU light sleep. USB power, an absent battery or
+  invalid power readings inhibit shutdown and reset inactivity. Recheck PMU
+  status immediately before shutdown; poll at 100 ms during the warning so
+  plugging in cancels it without redrawing the warning on battery updates.
+- Show a full-screen warning after 30 seconds. Paint it once, then replace only
+  its fixed-width opaque digits once per second (15..1); no full-screen refresh
+  on countdown ticks or battery updates. Touch/BOOT/PWR cancels the warning and
+  consumes the cancellation gesture, including BOOT hold/release.
+  Tell users to press the power button to turn back on at any time.
+- Performance, preparation, capture, voices/echo tails, live touches, diagnostics
+  and pending saves prevent shutdown. Pause audio cooperatively between complete
+  blocks before disabling the amplifier/display and requesting PMU shutdown.
+  Never suspend a task while it might own the engine mutex or use I2S.
+  A failed shutdown must restore the UI/audio and report POWER_OFF_ERROR.
+  Power-on is a fresh boot restoring the saved session, not RAM/undo resume.
+- Status exposes `idle_ms` and `power_countdown` (0 outside the warning).
+  `status`, `fingerprint` and `screenshot` do not reset inactivity; `wake` remains
+  a compatibility command to cancel/reset the countdown, not to power on.
+  `python tests\power_off_test.py --port COM3` checks USB inhibition without
+  playing sounds. Native tests cover countdown boundaries, busy activity and
+  power-source transitions. Battery countdown/cancellation and real power-off
+  require an unplugged board: also check the screen and PWR startup/session
+  restoration. A disappearing serial port alone is not proof of power-off.
+  The merged song-storage firmware passed 47 idle seconds on USB with no
+  countdown or audio errors. The user confirmed the unplugged countdown,
+  screen-off and PWR restart; post-restart fingerprints matched saved tracks,
+  microphone sample, FX and scenes. Battery current/lifetime was not measured.
 
 ### Touch reliability
 
@@ -578,7 +574,7 @@ Songs 14 and SongOptions 15 are the saved-song library and selected slot.
 `tap` calls the touch-release handler for a button; it is not a fake held pad.
 
 `status` includes transport, counts, pitch/tone/echo, battery validity, screen
-sleep, scene/FX, bank identity, heap, peak, render maximum and RX/capture drops.
+power-off countdown, scene/FX, bank identity, heap, peak, render maximum and RX/capture drops.
 `fingerprint` gives hashes, not recordings, only while stopped.
 `sample-dump` exports actual recorded PCM; never commit its output.
 `speaker-level` measures 400 ms of the real mic without replacing recorded audio.

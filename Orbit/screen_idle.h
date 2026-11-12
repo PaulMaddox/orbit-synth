@@ -2,31 +2,25 @@
 
 #include <stdint.h>
 
-class ScreenIdle {
+class IdlePowerOff {
 public:
-    static constexpr uint32_t TimeoutMs = 60000;
+    static constexpr uint32_t TimeoutMs = 45000;
+    static constexpr uint32_t WarningMs = 15000;
 
-    bool activity(uint32_t now) {
-        bool woke = sleeping_;
-        sleeping_ = false;
-        lastActivity_ = now;
-        return woke;
+    void activity(uint32_t now) { lastActivity_ = now; }
+
+    void update(uint32_t now, bool busy) {
+        if (busy) activity(now);
     }
 
-    bool sleepIfIdle(uint32_t now, bool busy = false) {
-        if (busy) {
-            lastActivity_ = now;
-            return false;
-        }
-        if (sleeping_ || idleMs(now) < TimeoutMs) return false;
-        sleeping_ = true;
-        return true;
+    bool due(uint32_t now) const { return idleMs(now) >= TimeoutMs; }
+    uint32_t countdown(uint32_t now) const {
+        uint32_t elapsed = idleMs(now);
+        if (elapsed < TimeoutMs - WarningMs || elapsed >= TimeoutMs) return 0;
+        return (TimeoutMs - elapsed + 999) / 1000;
     }
-
-    bool sleeping() const { return sleeping_; }
     uint32_t idleMs(uint32_t now) const { return now - lastActivity_; }
 
 private:
     uint32_t lastActivity_ = 0;
-    bool sleeping_ = false;
 };

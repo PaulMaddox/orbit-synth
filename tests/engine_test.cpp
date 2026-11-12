@@ -176,23 +176,28 @@ int main() {
         assert(ui::sliceAt(rect.x + 5, rect.y + 5) == pad);
     }
 
-    ScreenIdle screen;
-    screen.activity(1000);
-    assert(!screen.sleepIfIdle(60999));
-    assert(screen.sleepIfIdle(61000) && screen.sleeping());
-    assert(!screen.sleepIfIdle(62000));
-    assert(screen.activity(62000) && !screen.sleeping());
-    assert(!screen.sleepIfIdle(121999));
-    assert(!screen.activity(122000));
-    assert(!screen.sleepIfIdle(181999));
-    screen.activity(UINT32_MAX - 1000);
-    assert(!screen.sleepIfIdle(58998));
-    assert(screen.sleepIfIdle(58999));
-    assert(screen.activity(59000));
-    assert(!screen.sleepIfIdle(180000, true) && !screen.sleeping());
-    assert(!screen.sleepIfIdle(239999));
-    assert(screen.sleepIfIdle(240000));
-    assert(screen.activity(240001));
+    IdlePowerOff power;
+    power.activity(1000);
+    assert(power.countdown(30999) == 0);
+    for (uint32_t second = 0; second < 15; ++second) {
+        assert(power.countdown(31000 + second * 1000) == 15 - second);
+        assert(power.countdown(31999 + second * 1000) == 15 - second);
+        assert(!power.due(31999 + second * 1000));
+    }
+    assert(power.due(46000) && power.countdown(46000) == 0);
+    power.activity(46000);
+    assert(!power.due(46000) && power.countdown(46000) == 0);
+    power.update(80000, true);
+    assert(!power.due(124999));
+    assert(power.due(125000));
+    power.activity(120000);
+    assert(power.countdown(150000) == 15);
+    power.activity(150001);
+    assert(power.countdown(150001) == 0 && !power.due(195000));
+    power.activity(UINT32_MAX - 1000);
+    assert(power.countdown(28999) == 15);
+    assert(power.countdown(43998) == 1 && !power.due(43998));
+    assert(power.due(43999));
 
     auto engine = std::make_unique<Engine>();
     assert(Engine::valid(engine->session));

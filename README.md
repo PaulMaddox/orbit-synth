@@ -3,7 +3,7 @@
 **A pocket music maker for the [Waveshare ESP32-C6 Touch-LCD-1.83](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm).**
 
 <a href="https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm">
-  <img src="https://www.waveshare.com/img/devkit/ESP32-C6-Touch-LCD-1.83/ESP32-C6-Touch-LCD-1.83-details-1.jpg" alt="Waveshare ESP32-C6 Touch-LCD-1.83 device" width="360">
+  <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 device" width="360">
 </a>
 
 *Device photo: [Waveshare](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm).*

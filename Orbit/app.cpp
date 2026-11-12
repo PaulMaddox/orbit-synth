@@ -225,6 +225,10 @@ void pollBattery(uint32_t interval = 2000) {
     battery = next;
 }
 
+bool onBatteryPower() {
+    return battery.valid && battery.connected && !battery.usb && !battery.charging;
+}
+
 void header(const char *title, const Status &, bool back = false) {
     heading(ui::HeaderLeft, 26, title);
     if (!back && page != Confirm && page != Menu)
@@ -1433,6 +1437,13 @@ void powerOff() {
         toast("POWER OFF FAILED - TRY RESTART", 4000);
         return;
     }
+    pollBattery(0);
+    if (!onBatteryPower()) {
+        audioPauseRequested.store(false);
+        xTaskNotifyGive(audioHandle);
+        userActivity();
+        return;
+    }
     Serial.println("POWER_OFF idle_ms=45000");
     Serial.flush();
     board::amplifier(false);
@@ -1953,7 +1964,7 @@ void loop() {
     serialControl();
     pollTouch();
     pollButtons();
-    pollBattery();
+    pollBattery(powerCountdown ? 100 : 2000);
     if (page == Confirm && confirmation == RecordTrack) {
         int32_t remaining = int32_t(recordChoiceUntil - millis());
         if (remaining <= 0 && !touchDown) beginTrackRecording(true);
@@ -1992,7 +2003,7 @@ void loop() {
         referenceHz.load() || speakerMeterPending.load() || inputProbePending.load() ||
         (page == Confirm && confirmation == RecordTrack) ||
         (storageOk && s.revision != savedRevision);
-    idlePower.update(now, keepAwake);
+    idlePower.update(now, keepAwake, onBatteryPower());
     uint32_t countdown = idlePower.countdown(now);
     if (countdown != powerCountdown) {
         bool full = !powerCountdown || !countdown;

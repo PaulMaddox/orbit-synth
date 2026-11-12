@@ -69,7 +69,7 @@ details here and update the user guide and screenshots when behavior changes.
 | `tests/engine_test.cpp` | Native behavior/audio/layout regressions |
 | `tests/sound_loudness.h`, `speaker_adjustments.h` | Measured speaker response and empirical residual corrections |
 | `tests/speaker_levels_test.py`, `sound_performance_test.py`, `capture_test.py` | Hardware checks |
-| `tests/power_off_test.py` | Inaudible countdown/cancellation check; optional real shutdown |
+| `tests/power_off_test.py` | Inaudible USB automatic-power-off inhibition check |
 | `build.py`, `requirements.txt` | Portable discovery of the pinned Arduino toolchain; build/install/update |
 | `tools/requirements.txt` | Optional asset-generation, calibration and screenshot dependencies |
 | `docs/images/` | Current firmware screenshots used by README |
@@ -367,10 +367,14 @@ playback is not a substitute for that stress test.
 - FX has 64 points/loop, smoothed filter/echo changes, recording/undo and live override.
   Release on page changes, touch-read failure and hardware STOP to prevent stuck FX.
   Do not let a recorded movement overwrite notes or instrument settings.
-- After 45 stopped, idle seconds, request the AXP2101's documented shutdown
-  (COMMON_CONFIG bit 0, as used by XPowersLib::shutdown). Check the I2C read/write;
+- After 45 stopped, idle seconds on verified battery-only power, request the
+  AXP2101's documented shutdown (COMMON_CONFIG bit 0, as used by
+  XPowersLib::shutdown). Check the I2C read/write;
   preserve other bits, charging settings and rail configuration. This replaces
-  screen/audio standby and CPU light sleep on both USB and battery power.
+  screen/audio standby and CPU light sleep. USB power, an absent battery or
+  invalid power readings inhibit shutdown and reset inactivity. Recheck PMU
+  status immediately before shutdown; poll at 100 ms during the warning so
+  plugging in cancels it without redrawing the warning on battery updates.
 - Show a full-screen warning after 30 seconds. Paint it once, then replace only
   its fixed-width opaque digits once per second (15..1); no full-screen refresh
   on countdown ticks or battery updates. Touch/BOOT/PWR cancels the warning and
@@ -385,11 +389,15 @@ playback is not a substitute for that stress test.
 - Status exposes `idle_ms` and `power_countdown` (0 outside the warning).
   `status`, `fingerprint` and `screenshot` do not reset inactivity; `wake` remains
   a compatibility command to cancel/reset the countdown, not to power on.
-  `python tests\power_off_test.py --port COM3` checks countdown/cancellation
-  and redraw counts without playing sounds. `--shutdown` additionally requests
-  real power-off and expects the USB port to disappear. A disappearing port
-  alone is not proof of physical power-off: also check the screen and PWR
-  startup/session restoration, on both USB and battery-only power.
+  `python tests\power_off_test.py --port COM3` checks USB inhibition without
+  playing sounds. Native tests cover countdown boundaries, busy activity and
+  power-source transitions. Battery countdown/cancellation and real power-off
+  require an unplugged board: also check the screen and PWR startup/session
+  restoration. A disappearing serial port alone is not proof of power-off.
+  The merged song-storage firmware passed 47 idle seconds on USB with no
+  countdown or audio errors. The user confirmed the unplugged countdown,
+  screen-off and PWR restart; post-restart fingerprints matched saved tracks,
+  microphone sample, FX and scenes. Battery current/lifetime was not measured.
 
 ### Touch reliability
 

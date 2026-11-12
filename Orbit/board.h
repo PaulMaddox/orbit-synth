@@ -20,7 +20,7 @@ BatteryStatus readBattery();
 bool readTouch(int &x, int &y, bool &down);
 bool powerPressed();
 void amplifier(bool enabled);
-bool powerOff();
+void powerOff();
 bool micAvailable();
 uint32_t rxDrops();
 const char *error();

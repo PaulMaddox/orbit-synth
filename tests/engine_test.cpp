@@ -191,7 +191,7 @@ int main() {
     assert(power.due(46000) && power.countdown(46000) == 0);
     power.activity(46000);
     assert(!power.due(46000) && power.countdown(46000) == 0);
-    power.update(80000, true);
+    power.update(80000, true, true);
     assert(!power.due(124999));
     assert(power.due(125000));
     power.activity(120000);
@@ -202,6 +202,18 @@ int main() {
     assert(power.countdown(28999) == 15);
     assert(power.countdown(43998) == 1 && !power.due(43998));
     assert(power.due(43999));
+    power.update(50000, false, false);
+    assert(!power.due(50000) && power.countdown(50000) == 0);
+    power.update(150000, false, false);
+    assert(!power.due(150000) && power.countdown(150000) == 0);
+    power.update(150001, false, true);
+    assert(power.countdown(180000) == 15 && !power.due(194999));
+    assert(power.due(195000));
+    power.update(185000, false, false);
+    assert(power.countdown(185000) == 0 && !power.due(185000));
+    power.update(185001, false, true);
+    assert(power.countdown(215000) == 15 && !power.due(229999));
+    assert(power.due(230000));
 
     auto engine = std::make_unique<Engine>();
     assert(Engine::valid(engine->session));

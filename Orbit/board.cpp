@@ -139,16 +139,15 @@ bool readTouch(int &x, int &y, bool &down) {
     return true;
 }
 
-bool powerOff() {
+void powerOff() {
     // Same documented shutdown bit as XPowersLib::shutdown, with checked I2C.
     int config = power.readRegister(XPOWERS_AXP2101_COMMON_CONFIG);
     if (config < 0 || !write(AXP2101_SLAVE_ADDRESS, XPOWERS_AXP2101_COMMON_CONFIG, config | 1)) {
         Serial.println("POWER_OFF_ERROR PMU shutdown request");
-        return false;
+        return;
     }
     delay(1500);
     Serial.println("POWER_OFF_ERROR PMU did not turn off");
-    return false;
 }
 
 bool powerPressed() {

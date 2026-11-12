@@ -361,8 +361,9 @@ and microphone recording and cannot be undone, so save your current work into
 another slot first if you want to keep it. Cancelling leaves everything unchanged.
 If loading fails, your current song and recording stay intact.
 
-ORBIT turns off completely after **45 seconds** of stopped inactivity. A countdown
-appears for the **last 15 seconds**; touch the screen or press a button to keep
+On battery power, ORBIT turns off completely after **45 seconds** of stopped
+inactivity. It stays on while plugged into USB. A countdown appears for the
+**last 15 seconds**; touch the screen or press a button to keep
 using it. Playing, recording and microphone capture prevent automatic power-off,
 and ORBIT waits for pending saves. **Press the power button to turn it back on
 at any time.** Your saved session returns when it starts.

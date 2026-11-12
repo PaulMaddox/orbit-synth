@@ -9,8 +9,8 @@ public:
 
     void activity(uint32_t now) { lastActivity_ = now; }
 
-    void update(uint32_t now, bool busy) {
-        if (busy) activity(now);
+    void update(uint32_t now, bool busy, bool batteryPower) {
+        if (busy || !batteryPower) activity(now);
     }
 
     bool due(uint32_t now) const { return idleMs(now) >= TimeoutMs; }

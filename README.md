@@ -6,7 +6,7 @@
   <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 device" width="360">
 </a>
 
-https://github.com/user-attachments/assets/ab3096ea-b3a1-41c6-83c4-612d5da4fe14
+https://github.com/user-attachments/assets/5a181b3e-c020-4660-b8b7-ef50bc0bf94d
 
 *Foundry-animated product preview with ORBIT's firmware-rendered screens and actual audio.*
 

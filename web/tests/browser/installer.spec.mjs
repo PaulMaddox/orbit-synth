@@ -60,9 +60,29 @@ test("update requires confirmation after connecting, writes only the app, and cl
   expect(await page.evaluate(() => window.testDevice.addresses)).toBeUndefined();
   await expect(page.locator('input[value="install"]')).toBeDisabled();
   await page.locator("#write").click();
-  await expect(page.locator("#status")).toContainText("You're ready to make music");
+  await expect(page.locator("#status")).toContainText("ORBIT was written and verified");
   expect(await page.evaluate(() => window.testDevice.addresses)).toEqual([0x10000]);
+  const device = await page.evaluate(() => window.testDevice);
+  expect(device.closed).toBe(true);
+  expect(device.signals.map(({ name, value }) => [name, value])).toEqual([
+    ["DTR", false], ["RTS", true], ["RTS", false],
+  ]);
+  expect(device.signals[2].time - device.signals[1].time).toBeGreaterThanOrEqual(180);
+  expect(device.closedAt - device.signals[2].time).toBeGreaterThanOrEqual(180);
+});
+
+test("a failed restart preserves verified-write status, shows power-cycle help, and closes USB", async ({ page }) => {
+  await fakeDevice(page, { resetError: true });
+  await page.goto("mock/");
+  await page.locator("#board-check").check();
+  await page.locator("#connect").click();
+  await page.locator("#write").click();
+  await expect(page.locator("#status")).toContainText("ORBIT was written and verified");
+  await expect(page.locator("#status")).toContainText("Automatic restart failed: Reset signal failed");
+  await expect(page.locator("#status")).toContainText("fully off with PWR");
+  await expect(page.locator("#status")).toHaveAttribute("data-kind", "warning");
   expect(await page.evaluate(() => window.testDevice.closed)).toBe(true);
+  await expect(page.locator("#first-play")).toBeVisible();
 });
 
 test("first installation requires explicit data-loss acknowledgement and writes four images", async ({ page }) => {
@@ -75,8 +95,21 @@ test("first installation requires explicit data-loss acknowledgement and writes 
   await page.locator("#connect").click();
   await expect(page.locator("#write")).toHaveText("Install ORBIT now");
   await page.locator("#write").click();
-  await expect(page.locator("#status")).toContainText("You're ready to make music");
+  await expect(page.locator("#status")).toContainText("ORBIT was written and verified");
   expect(await page.evaluate(() => window.testDevice.addresses)).toEqual([0, 0x8000, 0xe000, 0x10000]);
+  expect(await page.evaluate(() => window.testDevice.reset)).toBe(true);
+});
+
+test("disconnecting before writing restarts ORBIT without writing flash", async ({ page }) => {
+  await fakeDevice(page);
+  await page.goto("mock/");
+  await page.locator("#board-check").check();
+  await page.locator("#connect").click();
+  await page.locator("#disconnect").click();
+  await expect(page.locator("#status")).toContainText("No flash was written");
+  expect(await page.evaluate(() => window.testDevice.addresses)).toBeUndefined();
+  expect(await page.evaluate(() => window.testDevice.reset)).toBe(true);
+  expect(await page.evaluate(() => window.testDevice.closed)).toBe(true);
 });
 
 test("connection errors and unplugged devices stay visible and release USB for retry", async ({ page }) => {

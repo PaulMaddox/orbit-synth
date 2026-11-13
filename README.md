@@ -74,8 +74,10 @@ Safari, Firefox and phone browsers are not supported by this USB installer.
 
 Routine updates write only the app and preserve ORBIT's song storage and
 recordings. If the existing layout doesn't match, the update stops without
-writing. After installation, ORBIT restarts; if the screen stays dark, unplug
-USB and reconnect. Start at a low volume and press **PLAY** to hear the starter demo.
+writing. After installation, the page requests a restart. If ORBIT doesn't
+respond, turn the board fully off with **PWR**, then turn it back on. Unplugging
+USB alone won't turn off a battery-powered board. Start at a low volume and
+press **PLAY** to hear the starter demo.
 
 If the board won't connect, unplug USB, hold **BOOT**, reconnect USB, then release
 BOOT and try again. A charge-only cable will not work. The flash page includes

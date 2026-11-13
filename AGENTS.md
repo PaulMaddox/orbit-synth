@@ -498,6 +498,13 @@ from app space without moving LittleFS.
 
 `web/index.html` is the page template; `web/src/` implements Web Serial flashing
 using pinned `esptool-js`, bundled inline with no runtime CDN dependencies.
+Version 0.7.1's `HardReset` only deasserts RTS, leaving the C6 in its flasher
+stub. The installer overrides its `hardReset` constructor: deassert DTR,
+assert RTS for 200 ms, deassert RTS, then wait 200 ms before closing USB.
+Use the transport signal methods to retain the Windows control-line workaround.
+Reset failures must not erase verified-write status; report them separately.
+Requesting reset is not proof that ORBIT booted. Recovery instructions must
+account for battery power: unplugging USB alone is not a full power cycle.
 Keep the ORBIT wordmark, actual firmware screenshot and beginner-oriented steps.
 The default web theme uses the firmware's navy background/panels, mint primary
 accent, and amber/purple/coral track accents (`Orbit/app.cpp` RGB565 constants).

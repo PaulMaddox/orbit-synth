@@ -70,7 +70,7 @@ async function closeConnection({ reset = true } = {}) {
   const errors = [];
   if (reset) {
     try { await current.loader.after("hard_reset"); }
-    catch (error) { errors.push(`Automatic restart failed: ${error.message}. Unplug USB and reconnect to restart ORBIT.`); }
+    catch (error) { errors.push(`Automatic restart failed: ${error.message}. Turn the board fully off with PWR, then turn it back on.`); }
   }
   try { await current.transport.disconnect(); }
   catch (error) { errors.push(`Could not close the USB connection: ${error.message}. Unplug USB before retrying.`); }
@@ -98,6 +98,18 @@ $("connect").addEventListener("click", async () => {
     loader = new ESPLoader({
       transport, baudrate: 115200, romBaudrate: 115200,
       terminal: { clean: () => {}, writeLine: log, write: log },
+      resetConstructors: {
+        // esptool-js 0.7.1 only releases RTS; native USB needs an actual reset pulse.
+        hardReset: (transport) => ({
+          async reset() {
+            await transport.setDTR(false);
+            await transport.setRTS(true);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            await transport.setRTS(false);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          },
+        }),
+      },
     });
     connection = { transport, loader, images, mode: mode() };
     await checkDevice(loader, images, mode());
@@ -137,7 +149,7 @@ $("write").addEventListener("click", async () => {
     $("progress-text").textContent = "All written images verified.";
     message(errors.length
       ? `ORBIT was written and verified. ${errors.join(" ")}`
-      : "You're ready to make music. ORBIT is restarting. If the screen stays dark, unplug USB and reconnect, then press PLAY.",
+      : "ORBIT was written and verified. Restart requested. If ORBIT doesn't respond, turn the board fully off with PWR, then turn it back on.",
     errors.length ? "warning" : "success");
   } catch (error) {
     log(error.message);

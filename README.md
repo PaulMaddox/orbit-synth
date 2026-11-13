@@ -133,28 +133,32 @@ routine update. To build without touching the device, run `python build.py`.
 
 ## Your first loop
 
-| Get ready: two loops | Practice: two loops |
+| Get ready: four beats | Practice: two loops |
 |---|---|
-| <img src="docs/images/get-ready.png" alt="Get Ready countdown with a large beat number and loop 1 of 2" width="240"> | <img src="docs/images/practice.png" alt="Practice countdown with a large beat number, loop 1 of 2 and a reminder to try the pads" width="240"> |
+| <img src="docs/images/get-ready.png" alt="Get Ready with a four-beat countdown and a reminder to listen to the beat" width="240"> | <img src="docs/images/practice.png" alt="Practice countdown with a large beat number, loop 1 of 2 and a reminder to try the pads" width="240"> |
 
 1. Tap **MELODY**, **BASS**, **BEATS** or **VOICE** to choose a track.
 2. Tap **RECORD**, or briefly press **BOOT**.
 3. Choose **START FRESH** to replace that track, or **KEEP + ADD NOTES** to layer
    more notes. START FRESH is selected after three seconds if you do not choose.
-4. Follow **GET READY**, then **PRACTICE**. Each stage lasts **two full loops**:
-   **8→1, then 8→1 again**, at your selected tempo. Listen to the beat during
-   GET READY; try your part on the pads during PRACTICE. Nothing is recorded yet.
-5. When **RECORDING** appears, play your part. It repeats over **two bars**.
-6. Tap **FINISH** to stop adding notes while the loop keeps playing.
+4. Listen through **GET READY: 4→3→2→1**, then try your part during **PRACTICE**.
+   Practice lasts **two full loops**: **8→1, then 8→1 again**.
+   Both stages run at an easy **60 BPM**. Nothing is recorded yet.
+5. When **RECORDING** appears, play your part at **60 BPM**. It repeats over **two bars**.
+6. Tap **FINISH** to stop adding notes. The loop keeps playing at your song's
+   original tempo.
 7. Choose another track and add another part.
 
-The screen shows the stage, a large beat countdown and **LOOP 1/2** or **LOOP 2/2**.
-Each stage is 16 beats; at 120 BPM the complete preparation takes 16 seconds.
+The screen shows the stage and a large beat countdown. During practice, it also
+shows **LOOP 1/2** or **LOOP 2/2**. The complete preparation takes 20 seconds:
+four seconds to get ready, then 16 seconds to practice.
 Existing backing tracks join in during PRACTICE. With START FRESH, the selected
 track's old part is silent during practice but is only replaced when recording
 actually begins.
 
-When music is already playing, preparation starts at the next loop boundary.
+When music is already playing, it keeps its original tempo until preparation
+starts at the next loop boundary. Your song's tempo is not changed: finishing,
+cancelling or stopping returns to it.
 **CANCEL** leaves your notes unchanged and restores the previous playback state;
 **STOP** stops everything. A new take automatically turns its selected track on.
 
@@ -266,9 +270,10 @@ Open **EXPLORE > LIVE FX**, press **PLAY**, then touch the big pad:
 - **Up:** more repeating echo.
 - **Lift:** remove your temporary effect without erasing any music.
 
-**REC MOVES** uses the same two-loop GET READY and two-loop PRACTICE stages,
-then records movement over one two-bar loop. Practice touches are heard but not
-saved. When already playing, preparation starts at the next loop boundary.
+**REC MOVES** uses the same four-beat GET READY countdown and two-loop PRACTICE
+stage, at your song's selected tempo, then records movement over one two-bar loop.
+Practice touches are heard but not saved. When already playing, preparation starts
+at the next loop boundary.
 Recording finishes automatically, or **FINISH** keeps a shorter pass.
 
 **OPTIONS** lets you turn recorded moves on/off, undo/redo, or clear them.
@@ -332,6 +337,11 @@ current master volume.
 
 Do not hold BOOT while powering on unless you intend to enter the ESP32 downloader.
 
+ORBIT greets you with a short, bright chime and plays a matching descending chime
+before automatic power-off. Chimes follow master volume, capped at a gentle level;
+volume 0 silences them. Touching a control stops a chime immediately.
+The long PWR hold is a hardware cutoff and does not play the shutdown chime.
+
 ORBIT saves your session automatically after stopping and leaving the controls
 idle. Wait for **SESSION SAVED** before powering off. The last session returns on
 the next boot. Automatic saving does not replace your saved song slots.
@@ -360,7 +370,8 @@ If loading fails, your current song and recording stay intact.
 On battery power, ORBIT turns off completely after **45 seconds** of stopped
 inactivity. It stays on while plugged into USB. A countdown appears for the
 **last 15 seconds**; touch the screen or press a button to keep
-using it. Playing, recording and microphone capture prevent automatic power-off,
+using it, including during the final one-second chime. Playing, recording and
+microphone capture prevent automatic power-off,
 and ORBIT waits for pending saves. **Press the power button to turn it back on
 at any time.** Your saved session returns when it starts.
 
@@ -375,7 +386,7 @@ does not invent a battery percentage.
 | Flash cannot connect | Check the port; if needed, use the board's BOOT/reset procedure, then release BOOT after upload. |
 | Silent music | Check master volume, the speaker connection, track ON/OFF and PLAY. VOICE needs a recording. |
 | A plucked sound will not sustain forever | This is intentional: guitar, piano and other plucked sounds decay naturally. |
-| Recording seems delayed | GET READY and PRACTICE each run for two full loops. Recording starts afterward; already-playing music first waits for a loop boundary. |
+| Recording seems delayed | GET READY counts 4→3→2→1, then PRACTICE runs for two full loops. Recording starts afterward; already-playing music first waits for a loop boundary. |
 | Voice is too short | Capture closer to the microphone and use FINISH RECORDING only after the sound. Maximum capture is two seconds. |
 | CAPTURE GLITCH | Stop playback, retry capture, and check USB power. |
 | Screen is dark | Press the power button to turn ORBIT on. Check USB/battery power if it stays dark. |

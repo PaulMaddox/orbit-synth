@@ -456,6 +456,10 @@ Result Engine::toggleRecord(bool replace) {
 }
 
 void Engine::setBpm(int bpm) { session.bpm = clamp(bpm, 60, 180); ++revision_; }
+uint16_t Engine::playbackBpm() const {
+    return recording_ || (armed_ && (preparation_ == RecordPreparation::GetReady ||
+        preparation_ == RecordPreparation::Practice)) ? 60 : session.bpm;
+}
 void Engine::setVolume(int volume) { session.volume = clamp(volume, 0, 80); ++revision_; }
 void Engine::setPatch(int patch) {
     session.tracks[selected_].patch = clamp(patch, 0, SoundCount - 1);
@@ -878,7 +882,7 @@ void Engine::trigger(int track, int pad, int velocity, uint32_t gate, bool live,
                 instrumentMidi(slot->patch, midi + session.tracks[track].pitch), velocity);
         }
         slot->hitAttack = std::min<uint32_t>(Sounds[slot->patch].attack,
-            slot->gate / session.bpm / 6);
+            slot->gate / playbackBpm() / 6);
     }
     slot->increment = uint32_t(440.0 * std::pow(2.0, (midi - 69) / 12.0) *
         (4294967296.0 / SampleRate));
@@ -937,16 +941,20 @@ void Engine::tune(Voice &v) {
 }
 
 void Engine::processTick() {
+    if (preparation_ == RecordPreparation::GetReady && tick_ == 4 * 96) {
+        preparation_ = RecordPreparation::Practice;
+        preparationLoop_ = 0;
+        tick_ = 0;
+    }
     if (tick_ == 0) {
         if (preparation_ == RecordPreparation::Waiting) {
             preparation_ = RecordPreparation::GetReady;
-            preparationLoop_ = 1;
+            preparationLoop_ = 0;
             for (Voice &v : voices_) if (!v.live) v.released = true;
-        } else if (preparation_ != RecordPreparation::None && ++preparationLoop_ > 2) {
-            preparation_ = preparation_ == RecordPreparation::GetReady ?
-                RecordPreparation::Practice : RecordPreparation::None;
-            preparationLoop_ = preparation_ == RecordPreparation::Practice ? 1 : 0;
-            if (preparation_ == RecordPreparation::None) preparationStartedPlayback_ = false;
+        } else if (preparation_ == RecordPreparation::Practice && ++preparationLoop_ > 2) {
+            preparation_ = RecordPreparation::None;
+            preparationLoop_ = 0;
+            preparationStartedPlayback_ = false;
         }
         if (nextScene_ >= 0) applyScene(nextScene_);
         if (fxRecording_) {
@@ -1003,7 +1011,7 @@ int32_t Engine::voiceSample(Voice &v) {
     const SoundPreset &sound = Sounds[v.patch];
     ++v.age;
     if (v.gate) {
-        v.hitProgress += session.bpm;
+        v.hitProgress += playbackBpm();
         if (v.live && v.hitProgress >= HitDuration - HitFade) {
             v.gate = 0;
             liveHeld_ = true;
@@ -1238,7 +1246,7 @@ int32_t Engine::voiceSample(Voice &v) {
 void Engine::render(int16_t *out, size_t count) {
     int maximum = 0;
     for (size_t i = 0; i < count; ++i) {
-        if (livePad_ >= 0) liveBeatUnits_ += session.bpm;
+        if (livePad_ >= 0) liveBeatUnits_ += playbackBpm();
         int32_t dry = 0, send = 0;
         if (!capturing_) {
             for (Voice &v : voices_) {
@@ -1278,7 +1286,7 @@ void Engine::render(int16_t *out, size_t count) {
         else quietSamples_ = 0;
         maximum = std::max(maximum, std::abs(int(out[i])));
         if (playing_ && !capturing_) {
-            phase_ += session.bpm * 96;
+            phase_ += playbackBpm() * 96;
             if (phase_ >= SampleRate * 60) {
                 phase_ -= SampleRate * 60;
                 tick_ = (tick_ + 1) % LoopTicks;
@@ -1296,15 +1304,15 @@ Status Engine::status() const {
     s.armed = armed_;
     s.preparation = preparation_;
     s.preparationLoop = preparationLoop_;
-    if (preparation_ == RecordPreparation::GetReady || preparation_ == RecordPreparation::Practice)
-        s.countdown = 8 - tick_ / 96;
+    if (preparation_ == RecordPreparation::GetReady) s.countdown = 4 - tick_ / 96;
+    else if (preparation_ == RecordPreparation::Practice) s.countdown = 8 - tick_ / 96;
     s.capturing = capturing_;
     s.undo = undoValid_;
     s.selected = selected_;
     s.step = tick_ / TicksPerStep;
     s.livePad = livePad_;
     s.tick = tick_;
-    s.bpm = session.bpm;
+    s.bpm = playbackBpm();
     s.volume = session.volume;
     s.root = session.root;
     s.scale = session.scale;

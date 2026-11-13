@@ -35,7 +35,8 @@ details here and update the user guide and screenshots when behavior changes.
   **Keep the product's ordinary save, undo and confirmation behavior.**
 - Never commit device dumps, credentials, raw sample caches,
   downloaded tools or generated build artifacts. Check `.gitignore` and the
-  staged diff before pushing. Generated original demo phrases are intentional assets.
+  staged diff before pushing. Generated original demo phrases and the approved
+  original power chimes are intentional assets.
 - Do not bypass Windows security restrictions. Use a trusted installed toolchain.
 - Do not change battery charging settings or undocumented power rails.
 
@@ -55,6 +56,8 @@ details here and update the user guide and screenshots when behavior changes.
 | `Orbit/sample_bank.h`, `sample_bank.cpp`, `sample_bank_lookup.cpp` | Generated recordings/FIR tables, register folding and sample lookup |
 | `Orbit/sound_levels.h` | Generated per-role/note/tone Q12 gains |
 | `Orbit/demo_sample.h`, `demo_sample.cpp` | Generated original demo speech |
+| `Orbit/power_chime.h`, `power_chime.cpp` | Isolated, direct-flash power chime playback and generated PCM |
+| `tools/build_power_chimes.py`, `tools/power-chimes/` | Lossless encoding and approved original chime WAVs |
 | `Orbit/es8311*`, `LICENSE-APACHE-2.0.txt` | Upstream codec driver and license |
 | `Orbit/FreeSansBold10pt7b.h` | Upstream bitmap heading font; see third-party notices |
 | `Orbit/partitions.csv` | Actual 16 MB flash layout |
@@ -134,6 +137,15 @@ USB-only, absent-battery and invalid-reading distinctions.
 - The output DC blocker deliberately uses signed division. A negative arithmetic
   right shift left a rounding residue that could stick at DC.
 - Ordinary echo: 4,096 samples, feedback 3/8. Recorded XY FX has its own delay/filter.
+- Startup/automatic-shutdown chimes are approved original glock phrases, rendered
+  offline from the licensed ORBIT bank. Preserve `tools/power-chimes/*.wav` exactly;
+  `python tools/build_power_chimes.py` losslessly regenerates their PCM arrays,
+  and `--check` verifies source hashes and generated content. Startup is C5 E5 G5
+  E5 C6 (110/110/165/110/500 ms); shutdown is C6 G5 E5 C5 (140/140/170/550 ms).
+  They bypass song voices/FX without modifying the session, sample, selection,
+  undo or revision. Playback uses integer gain `min(master volume, 35) / 128`,
+  including mute at volume 0. No heap allocation or DSP synthesis is needed.
+  User activity cancels chimes before ordinary controls run; saves wait for silence.
 - A slow UI redraw must not miss audio deadlines. Mixer playhead updates are
   incremental; do not repaint whole track rows every audio/display tick.
 
@@ -169,10 +181,16 @@ serial port. Check reconnection/user activity and actual boot/error logs first.
   Cancelling must not unmute it; undo restores its pre-take state.
 - Track and FX loop recording share `RecordPreparation`: Waiting (only when
   already playing), GetReady, Practice, then None when recording starts.
-  GetReady and Practice each last two full eight-beat loops (16 beats per stage).
-  Count 8 down to 1 twice per stage, at the current BPM, using the audio tick
-  clock rather than UI timers. Starting stopped enters GetReady immediately;
+  GetReady counts 4 down to 1 over four beats, with preparationLoop=0.
+  At its boundary reset the local tick to zero, then Practice counts 8 down to 1
+  for two full eight-beat loops (16 beats, preparationLoop=1/2).
+  Use the audio tick clock rather than UI timers. Starting stopped enters GetReady immediately;
   starting during playback waits for the next loop boundary first.
+  Track GetReady, Practice and recording use a temporary 60 BPM playback override;
+  Waiting and ordinary playback use `session.bpm`, which the override never changes.
+  Use the effective tempo for sequencing, note gates/attacks, live duration and status.
+  Finishing, cancelling, stop, undo and clear immediately remove the override.
+  FX-only preparation/recording continues at the song's selected tempo.
   Existing sequenced music is silent in GetReady and returns for Practice.
   Fresh takes suppress the selected old part during Practice without clearing
   notes until recording actually starts. Metronome clicks run in both stages.
@@ -375,6 +393,14 @@ playback is not a substitute for that stress test.
   invalid power readings inhibit shutdown and reset inactivity. Recheck PMU
   status immediately before shutdown; poll at 100 ms during the warning so
   plugging in cancels it without redrawing the warning on battery updates.
+- At the 45-second deadline, play the approved one-second shutdown chime through
+  the ordinary audio task before pausing it. Keep the final warning digit visible;
+  touch/BOOT/PWR and USB/invalid power readings still cancel during the chime.
+  Start-up chimes prevent idle shutdown; shutdown chimes must not reset their own
+  deadline. Wait 24 ms after the final chime block for the four-descriptor TX
+  queue to drain, then use the existing cooperative pause and final PMU recheck.
+  Chime audio errors or a 1.5-second timeout abort shutdown with POWER_OFF_ERROR.
+  Do not alter the PMU's long-press hardware cutoff to add a chime.
 - Show a full-screen warning after 30 seconds. Paint it once, then replace only
   its fixed-width opaque digits once per second (15..1); no full-screen refresh
   on countdown ticks or battery updates. Touch/BOOT/PWR cancels the warning and
@@ -476,7 +502,7 @@ home, redirected Documents/OneDrive path or SDK folder into the build.
 Native tests need g++ with C++17:
 
 ```sh
-g++ -std=c++17 -O2 -Wall -Wextra -Werror tests/engine_test.cpp Orbit/engine.cpp Orbit/sample_bank.cpp Orbit/sample_bank_lookup.cpp Orbit/demo_sample.cpp -o engine_test
+g++ -std=c++17 -O2 -Wall -Wextra -Werror tests/engine_test.cpp Orbit/engine.cpp Orbit/sample_bank.cpp Orbit/sample_bank_lookup.cpp Orbit/demo_sample.cpp Orbit/power_chime.cpp -o engine_test
 ./engine_test
 ```
 
@@ -494,8 +520,9 @@ On Windows, use `-o tests\song_storage_test.exe` and run
 replacement/write failures, corrupt/short reads, legacy file migration and restore state.
 
 The suite covers layout safety, valid saves/migration, natural registers, gestures,
+lossless power-chime playback across block sizes, mute/gain caps and cancellation,
 exact 60/120/180 BPM hit/preview lifetimes, tempo changes mid-note, fades, held
-release, all 32 preparation beats and stage boundaries, cancellation, practice
+release, all 20 preparation beats and stage boundaries, cancellation, practice
 audition without saving, tempo changes during preparation, scene copy/undo, all preset levels/headroom, pad spectral
 differences, full microphone/drum hits, pieces/FX, all demo tracks and scene contrast.
 PCM correlation alone is not proof that two pads sound different.
@@ -538,10 +565,12 @@ python build.py --flash COM3
 Navigate the device before each capture, or use the serial page controls.
 Use only original demo material for public screenshots of waveforms.
 Restore the normal build afterward. Do not present concept art as a current screenshot.
-ORBIT 3.2's two ready loops, two practice loops, discarded practice notes and actual
-recording were exercised on hardware with zero audio errors. Native tests cover
-each countdown beat, boundary and cancellation path. This short workflow check is
-not the separate twelve-voice hardware stress test.
+The four-beat ready countdown, two practice loops and actual recording were
+exercised on hardware: Practice began at 4.09 seconds, recording at 20.11 seconds,
+and finishing restored the song tempo. Audio error counts and song fingerprints
+were unchanged. Native tests cover each countdown beat, boundary, discarded
+practice notes and cancellation path. This short workflow check is not the
+separate twelve-voice hardware stress test.
 
 ## Serial control reference
 

@@ -113,6 +113,11 @@ def build(args):
         raise RuntimeError(f"Application exceeds the {APP_LIMIT:,}-byte partition.")
     print(f"Built {image.name}: {image.stat().st_size:,} / {APP_LIMIT:,} bytes", flush=True)
 
+    if args.web_output:
+        from tools.package_web_firmware import package_firmware
+        package_firmware(destination, platform / "tools" / "partitions" / "boot_app0.bin",
+                         args.web_output.resolve(), args.web_version, locations)
+
     port = args.install or args.flash
     if port:
         images = []
@@ -133,15 +138,23 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check installed build dependencies only")
     parser.add_argument("--build-path", type=pathlib.Path, help="Override the output directory")
     parser.add_argument("--screenshots", action="store_true", help="Enable optional framebuffer capture")
+    parser.add_argument("--web-output", type=pathlib.Path, help="Package firmware for the browser installer")
+    parser.add_argument("--web-version", help="Published build identifier (defaults to the source revision)")
     flashing = parser.add_mutually_exclusive_group()
     flashing.add_argument("--install", metavar="PORT", help="First install: bootloader, partitions and app")
     flashing.add_argument("--flash", metavar="PORT", help="Update only the application")
     args = parser.parse_args()
     if args.check and (args.install or args.flash):
         parser.error("--check cannot be combined with flashing")
+    if args.check and args.web_output:
+        parser.error("--check cannot package web firmware")
+    if args.web_version and not args.web_output:
+        parser.error("--web-version requires --web-output")
+    if args.screenshots and args.web_output:
+        parser.error("Publish the normal firmware, not a screenshots build")
     try:
         build(args)
-    except (RuntimeError, subprocess.CalledProcessError, OSError) as error:
+    except (RuntimeError, ValueError, subprocess.CalledProcessError, OSError) as error:
         print(f"BUILD_ERROR: {error}", file=sys.stderr)
         return 1
     return 0

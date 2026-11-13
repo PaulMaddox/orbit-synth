@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Give your ORBIT pocket music maker its latest sounds and features. Install or update directly over USB, right in your browser.">
+  <title>ORBIT · Plug in. Make music.</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme = param === "light" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --cp-bg: #080c18;
+      --cp-bg-elevated: #151e32;
+      --cp-surface: #101829;
+      --cp-surface-soft: #151e32;
+      --cp-border: #292c4a;
+      --cp-border-strong: #526079;
+      --cp-text: #eeeeee;
+      --cp-text-muted: #a4afbd;
+      --cp-text-soft: #83919c;
+      --cp-accent: #4ae2cd;
+      --cp-accent-hover: #7aebdb;
+      --cp-accent-soft: rgba(74, 226, 205, 0.1);
+      --cp-accent-fg: #080c18;
+      --cp-success: #4ae2cd;
+      --cp-danger: #ff757b;
+      --cp-warning: #ffbe62;
+      --cp-link: #4ae2cd;
+      --cp-shadow: 0 18px 48px rgba(8, 12, 24, 0.32);
+      --cp-overlay: rgba(8, 12, 24, 0.88);
+      --cp-panel: rgba(16, 24, 41, 0.72);
+      --cp-panel-strong: rgba(16, 24, 41, 0.96);
+      --cp-sheen: rgba(238, 238, 238, 0.04);
+      --cp-highlight: rgba(74, 226, 205, 0.12);
+      --cp-track-bass: #ffbe62;
+      --cp-track-beats: #bd71ff;
+      --cp-track-voice: #ff757b;
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --cp-bg: #f0f5f8;
+      --cp-bg-elevated: #f7fafc;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #e8eff5;
+      --cp-border: #cbd6e3;
+      --cp-border-strong: #83919c;
+      --cp-text: #101829;
+      --cp-text-muted: #4c5d73;
+      --cp-text-soft: #526079;
+      --cp-accent: #087c70;
+      --cp-accent-hover: #06665c;
+      --cp-accent-soft: rgba(8, 124, 112, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #087c70;
+      --cp-danger: #b42b40;
+      --cp-warning: #a25b00;
+      --cp-link: #087c70;
+      --cp-shadow: 0 18px 48px rgba(8, 12, 24, 0.12);
+      --cp-overlay: rgba(240, 245, 248, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(8, 124, 112, 0.12);
+      --cp-track-bass: #a25b00;
+      --cp-track-beats: #803eb5;
+      --cp-track-voice: #b42b40;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--cp-bg); color: var(--cp-text); font: 16px/1.6 "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif; }
+    a { color: inherit; text-underline-offset: 4px; }
+    a:hover { color: var(--cp-accent); }
+    button, input { font: inherit; }
+    button, a, input { -webkit-tap-highlight-color: var(--cp-highlight); }
+    :focus-visible { outline: 3px solid var(--cp-accent); outline-offset: 4px; }
+    button { cursor: pointer; }
+    .wrap { max-width: 1160px; margin: auto; padding: 0 40px; }
+    header { display: flex; align-items: center; justify-content: space-between; min-height: 112px; border-bottom: 1px solid var(--cp-border); gap: 24px; }
+    .brand { display: inline-flex; gap: 12px; align-items: center; text-decoration: none; font-weight: 850; font-size: 26px; letter-spacing: .2em; }
+    .mark { width: 42px; height: 42px; color: var(--cp-accent); flex-shrink: 0; }
+    nav { display: flex; gap: 28px; font-size: 14px; font-weight: 600; }
+    nav a { text-decoration: none; padding: 12px 0; }
+    .hero { display: grid; grid-template-columns: 1fr 456px; gap: 64px; padding: 68px 0 60px; align-items: start; }
+    .eyebrow { color: var(--cp-accent); font-size: 11px; font-weight: 750; letter-spacing: .15em; text-transform: uppercase; margin: 0 0 20px; }
+    h1 { font-size: clamp(48px, 5.7vw, 72px); letter-spacing: -.06em; font-weight: 800; line-height: 1.04; margin: 0 0 24px; }
+    h1 em { font-style: normal; color: var(--cp-accent); }
+    .intro { max-width: 380px; color: var(--cp-text-muted); font-size: 18px; margin-bottom: 28px; }
+    .small { font-size: 13px; color: var(--cp-text-muted); }
+    .preview { margin: 36px 0 0; display: flex; gap: 28px; align-items: center; }
+    .screen { position: relative; padding: 10px; background: var(--cp-surface); border: 1px solid var(--cp-border-strong); border-radius: 28px; transform: rotate(-5deg); flex-shrink: 0; }
+    .screen img { width: 156px; height: auto; display: block; border-radius: 20px; }
+    .preview figcaption { max-width: 180px; }
+    .preview strong { display: block; font-size: 18px; line-height: 1.4; margin-bottom: 8px; }
+    .preview p { margin: 0; font-size: 13px; color: var(--cp-text-muted); }
+    .screen-label { display: block; margin-top: 16px; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--cp-text-soft); }
+    .card { padding: 32px; border: 1px solid var(--cp-border); background: var(--cp-surface); border-radius: 16px; }
+    .card .eyebrow { margin-bottom: 8px; }
+    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h2 { font-size: 28px; letter-spacing: -.04em; line-height: 1.2; margin: 0 0 12px; }
+    .badge { display: inline-flex; font: 11px/1.5 Consolas, "Courier New", Courier, monospace; padding: 4px 8px; border-radius: 6px; background: var(--cp-accent-soft); color: var(--cp-accent); white-space: nowrap; }
+    .release-line { display: flex; gap: 12px; align-items: center; margin: 0 0 24px; font-size: 12px; color: var(--cp-text-muted); }
+    .release-line code { font: 11px Consolas, "Courier New", Courier, monospace; }
+    fieldset { border: 0; padding: 0; margin: 0; }
+    legend { margin-bottom: 12px; font-size: 13px; font-weight: 650; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .choice { display: flex; gap: 8px; padding: 12px; border: 1px solid var(--cp-border); border-radius: .625rem; cursor: pointer; font-size: 13px; font-weight: 650; align-items: start; }
+    .choice:has(input:checked) { border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+    input { accent-color: var(--cp-accent); flex-shrink: 0; width: 16px; height: 16px; margin: 3px 0 0; }
+    .choice small { display: block; color: var(--cp-text-muted); font-size: 11px; font-weight: 400; margin-top: 2px; }
+    #mode-note { min-height: 42px; font-size: 12px; color: var(--cp-text-muted); margin: 12px 0 16px; }
+    .check { display: flex; align-items: start; gap: 12px; padding: 12px 0; font-size: 12px; cursor: pointer; line-height: 1.6; }
+    .warning { padding: 12px 16px; border-left: 3px solid var(--cp-warning); background: var(--cp-bg-elevated); border-radius: .625rem; font-size: 13px; margin: 12px 0; }
+    .warning p { margin: 0; }
+    .primary { display: block; width: 100%; padding: 16px 20px; min-height: 56px; border: 0; border-radius: .625rem; background: var(--cp-accent); color: var(--cp-accent-fg); font-weight: 700; font-size: 15px; margin: 16px 0 0; }
+    .primary:hover:not(:disabled) { background: var(--cp-accent-hover); }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    .text-button { background: none; border: 0; color: var(--cp-text); padding: 12px 0; text-decoration: underline; font-size: 13px; }
+    #status { font-size: 13px; line-height: 1.6; margin: 20px 0 0; border-top: 1px solid var(--cp-border); padding-top: 16px; }
+    #status[data-kind="error"] { color: var(--cp-danger); }
+    #status[data-kind="success"] { color: var(--cp-success); }
+    #status[data-kind="warning"] { color: var(--cp-text); }
+    progress { width: 100%; accent-color: var(--cp-accent); height: 12px; margin-top: 20px; }
+    #progress-text { font-size: 12px; color: var(--cp-text-muted); margin: 4px 0 0; }
+    .privacy { text-align: center; font-size: 11px; margin: 12px 0 0; color: var(--cp-text-soft); }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; padding: 36px 0; border-top: 1px solid var(--cp-border); border-bottom: 1px solid var(--cp-border); }
+    .step-number { color: var(--cp-accent); font: 12px Consolas, "Courier New", Courier, monospace; }
+    .steps > :nth-child(2) .step-number { color: var(--cp-track-bass); }
+    .steps > :nth-child(3) .step-number { color: var(--cp-track-beats); }
+    h3 { font-size: 16px; margin: 8px 0; letter-spacing: -.02em; }
+    .steps p { font-size: 13px; margin: 0; color: var(--cp-text-muted); }
+    .help { padding: 52px 0 60px; display: grid; grid-template-columns: 1fr 1.7fr; gap: 64px; }
+    .help h2 { font-size: 24px; }
+    .help p { font-size: 13px; color: var(--cp-text-muted); margin: 12px 0; }
+    details { border-bottom: 1px solid var(--cp-border); padding: 16px 0; }
+    details:first-child { padding-top: 0; }
+    summary { font-size: 14px; font-weight: 650; cursor: pointer; min-height: 28px; }
+    details[open] summary { color: var(--cp-accent); }
+    .log-details { padding-top: 16px !important; }
+    .log-details summary { font-size: 12px; font-weight: 400; color: var(--cp-text-muted); }
+    pre { max-height: 200px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; background: var(--cp-surface-soft); color: var(--cp-text); border-radius: .625rem; padding: 12px; font: 11px/1.6 Consolas, "Courier New", Courier, monospace; }
+    footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--cp-border); padding: 24px 0 32px; font-size: 12px; color: var(--cp-text-soft); }
+    footer a { margin-left: 20px; }
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr 420px; gap: 32px; }
+      .wrap { padding: 0 24px; }
+      .card { padding: 24px; }
+      .preview { gap: 20px; }
+      .screen img { width: 120px; }
+    }
+    @media (max-width: 760px) {
+      header { min-height: 88px; }
+      .brand { font-size: 22px; }
+      nav { gap: 16px; font-size: 12px; }
+      .hero { grid-template-columns: 1fr; padding-top: 40px; gap: 36px; }
+      h1 { font-size: 56px; }
+      .intro { max-width: 100%; }
+      .preview { margin-top: 24px; }
+      .preview figcaption { max-width: 260px; }
+      .steps { grid-template-columns: 1fr; gap: 28px; }
+      .help { grid-template-columns: 1fr; gap: 20px; padding-top: 36px; }
+      footer { flex-direction: column; }
+      footer a { margin: 0 20px 0 0; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="./" aria-label="ORBIT home">
+        <svg class="mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <circle cx="24" cy="24" r="13" stroke="currentColor" stroke-width="2.5"/>
+          <ellipse cx="24" cy="24" rx="23" ry="8" transform="rotate(-35 24 24)" stroke="currentColor" stroke-width="2"/>
+          <circle cx="41" cy="12" r="3" fill="currentColor"/>
+        </svg>
+        ORBIT
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#help">Need a hand?</a>
+        <a href="https://github.com/PaulMaddox/orbit-synth">User guide ↗</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="headline">
+        <div>
+          <p class="eyebrow">The pocket music maker</p>
+          <h1 id="headline">Plug in.<br>Find your<br><em>own rhythm.</em></h1>
+          <p class="intro">Big musical ideas. Little ORBIT.<br>Get the latest sounds and features straight from your browser.</p>
+          <p class="small">No downloads to open. No account to create.<br>Just your board, a USB cable, and a little curiosity.</p>
+          <figure class="preview">
+            <div class="screen"><img src="images/play.png" alt="ORBIT's actual performance screen, with four tracks and eight playable pads" width="240" height="284"></div>
+            <figcaption>
+              <strong>Four tracks.<br>Endless starting points.</strong>
+              <p>Make beats, play 30 sounds, sample your voice. Then take it all offline.</p>
+              <span class="screen-label">Actual ORBIT screen</span>
+            </figcaption>
+          </figure>
+        </div>
+        <div>
+          <form class="card" id="installer" aria-labelledby="install-heading">
+            <p class="eyebrow">A fresh start. Or your next update.</p>
+            <div class="card-heading">
+              <h2 id="install-heading">Hello, ORBIT.</h2>
+              <span class="badge" id="version">Checking build…</span>
+            </div>
+            <p class="release-line">
+              Latest published build <a id="source" href="https://github.com/PaulMaddox/orbit-synth"><code id="revision">—</code></a>
+              <a id="release" hidden href="https://github.com/PaulMaddox/orbit-synth/releases">What's new ↗</a>
+            </p>
+            <div class="warning" id="browser-help" hidden>
+              <strong>A desktop browser is needed.</strong>
+              <p>Open this page in Chrome or Microsoft Edge on a computer. Safari, Firefox, and phone browsers cannot use this USB installer. No device has been changed.</p>
+            </div>
+            <fieldset>
+              <legend>What's connected?</legend>
+              <div class="choices">
+                <label class="choice">
+                  <input type="radio" name="mode" value="update" checked>
+                  <span>Already has ORBIT<small>Keep my songs</small></span>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="mode" value="install">
+                  <span>A new board<small>First installation</small></span>
+                </label>
+              </div>
+            </fieldset>
+            <p id="mode-note">Only the app is updated. Your ORBIT songs and recordings stay in place.</p>
+            <label class="check">
+              <input type="checkbox" id="board-check">
+              <span>My board is the <strong>Waveshare ESP32-C6 Touch-LCD-1.83</strong> with <strong>16 MB flash</strong>. Not another ESP32 board.</span>
+            </label>
+            <div class="warning" id="install-warning" hidden>
+              <strong>First installation replaces the firmware and layout.</strong>
+              <label class="check"><input type="checkbox" id="data-check"><span>I understand that existing data on this board may be lost.</span></label>
+            </div>
+            <button type="button" class="primary" id="connect" disabled>Connect my ORBIT →</button>
+            <button type="button" class="primary" id="write" hidden disabled>Update ORBIT now</button>
+            <button type="button" class="text-button" id="disconnect" hidden>Cancel and disconnect</button>
+            <progress id="progress" max="100" value="0" aria-label="Firmware writing progress" hidden></progress>
+            <p id="progress-text" aria-live="polite"></p>
+            <p id="status" role="status" aria-live="polite">Checking the latest firmware…</p>
+            <button type="button" class="text-button" id="reload" hidden>Try loading firmware again</button>
+            <p class="small" id="first-play" hidden>Start at a low volume. Press <strong>PLAY</strong> for the starter demo, or tap a pad to find your sound.</p>
+            <details class="log-details">
+              <summary>Connection details</summary>
+              <pre id="log" aria-label="Local connection log">Connection messages will appear here.</pre>
+            </details>
+            <noscript><p class="warning">Enable JavaScript to use the USB installer. You can also follow the <a href="https://github.com/PaulMaddox/orbit-synth#install-orbit">manual installation guide</a>.</p></noscript>
+          </form>
+          <p class="privacy">USB stays local. Your songs and recordings are not uploaded.</p>
+        </div>
+      </section>
+      <section class="steps" aria-label="Three steps to making music">
+        <div><span class="step-number">01 / PLUG IN</span><h3>One cable. That's it.</h3><p>Connect your board with a USB data cable. Stop playback and close any serial monitor first.</p></div>
+        <div><span class="step-number">02 / CONNECT &amp; CONFIRM</span><h3>Your browser does the rest.</h3><p>Choose the USB device in the browser's list. We'll check the chip and firmware before you confirm the write.</p></div>
+        <div><span class="step-number">03 / GO MAKE SOMETHING</span><h3>Less setup. More play.</h3><p>Wait for writing and verification to finish. ORBIT restarts, and your next idea is just a tap away.</p></div>
+      </section>
+      <section class="help" id="help" aria-labelledby="help-heading">
+        <div>
+          <p class="eyebrow">A little help getting started</p>
+          <h2 id="help-heading">Let's get you playing.</h2>
+          <p>Only the Waveshare ESP32-C6 Touch-LCD-1.83 with 16 MB flash is supported. Chip detection can't identify the exact board, so check the name on your hardware.</p>
+          <p><a href="https://www.waveshare.com/wiki/ESP32-C6-Touch-LCD-1.83">Board &amp; hardware guide ↗</a></p>
+        </div>
+        <div>
+          <details id="connection-help">
+            <summary>My board doesn't appear, or won't connect.</summary>
+            <p>Use desktop Chrome or Edge and a USB data cable, not a charge-only cable. Close Arduino, serial monitors, and any other tab using the device. Try a direct USB port instead of a hub.</p>
+            <p>If it still won't connect: unplug USB, hold <strong>BOOT</strong>, reconnect USB while holding it, then release BOOT and try again. Select the Espressif USB Serial/JTAG device. After installation, unplug and reconnect if ORBIT doesn't start automatically.</p>
+            <p>Linux may require serial-port access for your user account; follow your distribution's device-permission guidance. On a managed computer, ask your administrator rather than disabling security settings.</p>
+          </details>
+          <details>
+            <summary>Will an update erase my songs?</summary>
+            <p>Choose <strong>Already has ORBIT</strong>. Updates write only the application and leave ORBIT's song storage, recordings, and partition table untouched. The installer refuses an update if the existing layout doesn't match.</p>
+            <p><strong>A new board</strong> also writes the bootloader, partition table, and boot support. Use it only for first installation or when you are happy to replace other firmware and potentially lose its data.</p>
+          </details>
+          <details>
+            <summary>What happens if I unplug it halfway through?</summary>
+            <p>The installation may be incomplete. Reconnect, use BOOT if needed, and retry the <strong>same installation type</strong>. Don't switch to first installation to fix a routine update. Keep the USB cable connected and the tab open until verification finishes.</p>
+          </details>
+          <details>
+            <summary>Where does this firmware come from?</summary>
+            <p>Each successful publication from the ORBIT project's main branch creates a numbered GitHub release. This page installs that same build, with download checksums and on-device verification. All flashing runs locally in your browser.</p>
+            <p><a href="https://github.com/PaulMaddox/orbit-synth/releases">Browse firmware releases ↗</a> · <a href="https://github.com/PaulMaddox/orbit-synth#install-orbit">Prefer manual installation? ↗</a></p>
+          </details>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span>ORBIT · Small enough to take. Big enough to make.</span>
+      <span><a href="https://github.com/PaulMaddox/orbit-synth">View source ↗</a><a href="firmware/assets/ATTRIBUTION.txt">Sound credits</a><a href="third-party-licenses.txt">Installer licenses</a></span>
+    </footer>
+  </div>
+  <!-- INSTALLER_SCRIPT -->
+</body>
+</html>

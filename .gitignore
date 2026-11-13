@@ -24,3 +24,7 @@ __pycache__/
 .env.*
 .DS_Store
 Thumbs.db
+/web/node_modules/
+/web/dist/
+/web/test-results/
+/web/playwright-report/

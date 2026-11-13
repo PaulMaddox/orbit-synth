@@ -42,6 +42,20 @@ redistributing a recording bank or firmware. No source author's endorsement is i
   [upstream licensing](https://www.gnu.org/software/freefont/license.html) and
   [font sources](https://ftp.gnu.org/gnu/freefont/).
 
+## Browser installer
+
+The browser installer bundles these upstream packages with their original licenses:
+
+- [esptool-js](https://github.com/espressif/esptool-js), Espressif Systems: Apache-2.0,
+  including its bundled flash-loader stubs.
+- [pako](https://github.com/nodeca/pako): MIT and Zlib.
+- [atob-lite](https://github.com/hughsk/atob-lite): MIT.
+- [spark-md5](https://github.com/satazor/js-spark-md5): WTFPL-2.0.
+
+`web/build.mjs` includes the full installed package notices in the published
+`third-party-licenses.txt`. Firmware packages also retain the recording attribution,
+font and codec licenses, and the installed graphics/power-library notices.
+
 ## Original material
 
 Electronic presets and demo compositions are original ORBIT material.

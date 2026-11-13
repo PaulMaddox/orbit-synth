@@ -75,6 +75,9 @@ details here and update the user guide and screenshots when behavior changes.
 | `tests/power_off_test.py` | Inaudible USB automatic-power-off inhibition check |
 | `build.py`, `requirements.txt` | Portable discovery of the pinned Arduino toolchain; build/install/update |
 | `tools/requirements.txt` | Optional asset-generation, calibration and screenshot dependencies |
+| `web/` | ORBIT browser installer source, pinned bundler/flasher dependencies and browser regressions |
+| `tools/package_web_firmware.py` | Validates and packages separate images and integrity metadata for the installer |
+| `.github/workflows/publish.yml` | Builds releases and publishes the matching GitHub Pages installer on main |
 | `docs/images/` | Current firmware screenshots used by README |
 
 `build/`, `build-*/`, `vendor/`, `assets/cache/` and root diagnostics are disposable
@@ -490,6 +493,50 @@ or repartition to save a little code space. The coredump reservation was carved
 from app space without moving LittleFS.
 
 ## Build and verification workflow
+
+### Browser installer and releases
+
+`web/index.html` is the page template; `web/src/` implements Web Serial flashing
+using pinned `esptool-js`, bundled inline with no runtime CDN dependencies.
+Keep the ORBIT wordmark, actual firmware screenshot and beginner-oriented steps.
+The default web theme uses the firmware's navy background/panels, mint primary
+accent, and amber/purple/coral track accents (`Orbit/app.cpp` RGB565 constants).
+The installer supports desktop Chrome/Edge in a secure context; it never uploads
+device recordings. The chip/capacity check cannot identify an exact board, so
+retain the Waveshare model acknowledgement.
+
+Every successful `main` publication (including a merged PR) builds the normal
+firmware, creates a numbered `build-N` GitHub release, then deploys GitHub Pages.
+The release ZIP and Pages firmware must come from the same build. Configure
+repository Pages with **GitHub Actions** as the source; never commit binaries
+or `web/dist/`. A manual workflow run on `main` also publishes a build.
+
+`python build.py --web-output web/dist/firmware --web-version build-N` reuses
+the normal pinned toolchain and partition limits. Packaging validates the C6
+image headers, the exact partition entries/checksum and each region's size.
+The manifest points to revision-scoped separate images with SHA-256 hashes;
+the browser checks downloads before connecting, then chip/capacity and (for
+updates) the existing partition bytes before enabling the write confirmation.
+Updates write only `0x10000`; first installation writes `0x0`, `0x8000`,
+`0xe000` and `0x10000`. Never enable whole-chip erase, merge the gaps into an
+image or write the partition table during an update. `esptool-js` checks
+each written image's on-device MD5 against the actual (header-patched) payload.
+Do not treat transfer progress alone as successful verification.
+
+```sh
+python -m unittest discover -s tests -p test_web_firmware.py
+cd web
+npm ci
+npm test
+npm run build
+npm run test:browser
+```
+
+Local browser checks use installed Microsoft Edge; CI installs Playwright Chromium.
+Browser regressions cover the actual bundle at a repository subpath and a
+test-only mocked loader for connection/confirmation/write/failure flows.
+They are not proof of flashing physical hardware. Serve `web/dist` over localhost
+for a local preview; firmware must first be packaged with `build.py --web-output`.
 
 Dependencies and beginner setup are in README. `build.py` discovers Arduino CLI
 via `--cli`, `ARDUINO_CLI`, PATH, or the existing Windows Arduino IDE installation.

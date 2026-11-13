@@ -4,6 +4,20 @@ ORBIT-specific code is published here without an additional open-source license.
 Do not assume this grants permission to redistribute that code. Third-party
 components retain their own licenses; this file does not replace them.
 
+## Hardware photographs
+
+`docs/images/device.png` combines Waveshare's original labeled device photograph
+with its [optional 400 mAh battery photograph](https://www.waveshare.com/img/devkit/general/battery-3.7V-400mAh.jpg).
+The original device image and labels are unchanged; the battery photo is cropped
+and resized, with an added specification label. No generated battery image is used.
+The photographs remain Waveshare's material; no endorsement or additional license
+is implied.
+
+The [exact device listing](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm)
+links this optional 602525 lithium battery, marked 3.7 V and 400 mAh.
+[Waveshare's documentation](https://docs.waveshare.com/ESP32-C6-Touch-LCD-1.83)
+recommends 6 x 25 x 25 mm for installation inside the case.
+
 ## Instrument recordings
 
 The firmware contains modified recordings from:

@@ -3,7 +3,7 @@
 **A pocket music maker for the [Waveshare ESP32-C6 Touch-LCD-1.83](https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm) (~$20 on AliExpress etc).**
 
 <a href="https://www.waveshare.com/esp32-c6-touch-lcd-1.83.htm">
-  <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 device" width="360">
+  <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 hardware labels and optional internal lithium battery: 6 x 25 x 25 mm, 3.7 V, 400 mAh" width="700">
 </a>
 
 ⚡Already got a device? Click here to flash the latest version of ORBIT right from your browser: [Flash ORBIT](https://paulmaddox.github.io/orbit-synth/)

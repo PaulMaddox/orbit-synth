@@ -545,7 +545,7 @@ test-only mocked loader for connection/confirmation/write/failure flows.
 They are not proof of flashing physical hardware. Serve `web/dist` over localhost
 for a local preview; firmware must first be packaged with `build.py --web-output`.
 
-Dependencies and beginner setup are in README. `build.py` discovers Arduino CLI
+Manual build dependencies and setup are in BUILD.md. `build.py` discovers Arduino CLI
 via `--cli`, `ARDUINO_CLI`, PATH, or the existing Windows Arduino IDE installation.
 It gets data/library directories from CLI, requires core 3.3.2 / GFX 1.6.3 /
 XPowersLib 0.3.0, copies the small required graphics subset into ignored `vendor/`,

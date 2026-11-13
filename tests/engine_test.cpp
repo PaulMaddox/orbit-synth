@@ -5,6 +5,7 @@
 #include "../Orbit/screen_idle.h"
 #include "../Orbit/ui_layout.h"
 #include "../Orbit/touch_gesture.h"
+#include "../Orbit/power_chime.h"
 #include "sound_loudness.h"
 
 #include <algorithm>
@@ -32,7 +33,7 @@ void advance(Engine &engine, uint32_t samples) {
 }
 
 void waitForRecording(Engine &engine) {
-    uint32_t remaining = SampleRate * 41;
+    uint32_t remaining = SampleRate * 29;
     while ((engine.status().armed || engine.status().fxArmed) && remaining >= 64) {
         advance(engine, 64);
         remaining -= 64;
@@ -107,6 +108,32 @@ void assertFooterCoverage(const ui::Rect (&buttons)[N], const ui::Rect (&targets
 }
 
 int main() {
+    for (const PowerChimeAudio *audio : {&StartupChime, &ShutdownChime}) {
+        for (uint32_t block : {1u, 64u, 127u}) {
+            PowerChimePlayer player;
+            player.start(*audio, 80);
+            std::vector<int16_t> output(audio->frames + block, -1);
+            for (size_t start = 0; start < output.size(); start += block)
+                player.render(output.data() + start, std::min<size_t>(block, output.size() - start));
+            assert(!player.active());
+            for (size_t i = 0; i < audio->frames; ++i)
+                assert(output[i] == int32_t(audio->samples[i]) * 35 / 128);
+            for (size_t i = audio->frames; i < output.size(); ++i) assert(output[i] == 0);
+        }
+    }
+    PowerChimePlayer chime;
+    int16_t chimeBlock[64];
+    chime.start(StartupChime, 0);
+    chime.render(chimeBlock, 64);
+    for (int16_t sample : chimeBlock) assert(sample == 0);
+    chime.start(ShutdownChime, 12);
+    chime.render(chimeBlock, 64);
+    for (int i = 0; i < 64; ++i)
+        assert(chimeBlock[i] == int32_t(ShutdownChime.samples[i]) * 12 / 128);
+    chime.stop();
+    chime.render(chimeBlock, 64);
+    for (int16_t sample : chimeBlock) assert(sample == 0);
+
     assertCornerSafe(ui::HeaderStatus);
     assertCornerSafe(ui::Back);
     assertCornerSafe(ui::BackTouch);
@@ -473,28 +500,33 @@ int main() {
     auto beforePreparation = std::make_unique<Session>(preparation->session);
     uint32_t preparationRevision = preparation->revision();
     preparation->toggleRecord(true);
-    for (int beat = 0; beat < 32; ++beat) {
+    for (int beat = 0; beat < 20; ++beat) {
         Status status = preparation->status();
         assert(status.armed && !status.recording);
-        assert(status.preparation == (beat < 16 ?
+        assert(status.preparation == (beat < 4 ?
             RecordPreparation::GetReady : RecordPreparation::Practice));
-        assert(status.countdown == 8 - beat % 8);
-        assert(status.preparationLoop == 1 + (beat % 16) / 8);
+        assert(status.countdown == (beat < 4 ? 4 - beat : 8 - (beat - 4) % 8));
+        assert(status.preparationLoop == (beat < 4 ? 0 : 1 + (beat - 4) / 8));
+        assert(status.bpm == 60 && preparation->session.bpm == 120);
         assert(preparation->revision() == preparationRevision);
         assert(std::memcmp(preparation->session.tracks, beforePreparation->tracks,
             sizeof(beforePreparation->tracks)) == 0);
-        if (beat < 16) assert(status.activePads[1] == 0);
-        if (beat == 16) assert(status.activePads[1] != 0 && status.activePads[0] == 0);
+        if (beat < 4) assert(status.activePads[1] == 0);
+        if (beat == 4) {
+            assert(status.tick == 0);
+            assert(status.activePads[1] != 0 && status.activePads[0] == 0);
+        }
         preparation->noteOn(beat % 8);
         advance(*preparation, 32);
         preparation->noteOff();
         assert(preparation->session.tracks[0].count == beforePreparation->tracks[0].count);
-        advance(*preparation, SampleRate / 2 - 33);
+        advance(*preparation, SampleRate - 33);
         assert(preparation->status().armed && !preparation->status().recording);
         advance(*preparation, 1);
     }
     assert(preparation->status().recording && !preparation->status().armed);
     assert(preparation->status().preparation == RecordPreparation::None);
+    assert(preparation->status().bpm == 60 && preparation->session.bpm == 120);
     assert(preparation->session.tracks[0].count == 0);
     assert(std::memcmp(preparation->session.tracks + 1, beforePreparation->tracks + 1,
         sizeof(Track) * (TrackCount - 1)) == 0);
@@ -503,6 +535,7 @@ int main() {
     preparation->noteOff();
     assert(preparation->session.tracks[0].count == 1);
     preparation->stop();
+    assert(preparation->status().bpm == 120);
     preparation->undo();
     assert(std::memcmp(preparation->session.tracks, beforePreparation->tracks,
         sizeof(beforePreparation->tracks)) == 0);
@@ -512,26 +545,33 @@ int main() {
     cancelPreparation->setBpm(120);
     auto beforeCancel = std::make_unique<Session>(cancelPreparation->session);
     cancelPreparation->toggleRecord(true);
-    advance(*cancelPreparation, SampleRate * 8);
+    advance(*cancelPreparation, SampleRate * 4);
     assert(cancelPreparation->status().preparation == RecordPreparation::Practice);
     cancelPreparation->toggleRecord();
     assert(!cancelPreparation->status().playing && !cancelPreparation->status().armed);
     assert(cancelPreparation->status().preparation == RecordPreparation::None);
+    assert(cancelPreparation->status().bpm == 120 && cancelPreparation->session.bpm == 120);
     assert(std::memcmp(cancelPreparation->session.tracks, beforeCancel->tracks,
         sizeof(beforeCancel->tracks)) == 0);
     cancelPreparation->togglePlay();
     advance(*cancelPreparation, SampleRate / 4);
     cancelPreparation->toggleRecord(true);
     assert(cancelPreparation->status().preparation == RecordPreparation::Waiting);
+    assert(cancelPreparation->status().bpm == 120);
     advance(*cancelPreparation, SampleRate * 4 - SampleRate / 4 - 1);
     assert(cancelPreparation->status().preparation == RecordPreparation::Waiting);
     advance(*cancelPreparation, 1);
     assert(cancelPreparation->status().preparation == RecordPreparation::GetReady);
-    advance(*cancelPreparation, SampleRate * 8);
+    assert(cancelPreparation->status().bpm == 60);
+    advance(*cancelPreparation, SampleRate * 4);
     assert(cancelPreparation->status().preparation == RecordPreparation::Practice);
     cancelPreparation->toggleRecord();
     assert(cancelPreparation->status().playing && !cancelPreparation->status().armed);
     assert(cancelPreparation->status().preparation == RecordPreparation::None);
+    assert(cancelPreparation->status().bpm == 120);
+    uint16_t resumedTick = cancelPreparation->status().tick;
+    advance(*cancelPreparation, SampleRate / 2);
+    assert(cancelPreparation->status().tick == (resumedTick + 96) % LoopTicks);
     advance(*cancelPreparation, SampleRate * 8);
     assert(!cancelPreparation->status().recording);
     cancelPreparation->stop();
@@ -539,27 +579,51 @@ int main() {
     cancelPreparation->undo();
     assert(!cancelPreparation->status().playing);
     assert(cancelPreparation->status().preparation == RecordPreparation::None);
+    assert(cancelPreparation->status().bpm == 120);
     cancelPreparation->toggleRecord(true);
     cancelPreparation->clearSelected();
     assert(!cancelPreparation->status().playing);
     assert(cancelPreparation->status().preparation == RecordPreparation::None);
+    assert(cancelPreparation->status().bpm == 120);
 
     auto preparationTempo = std::make_unique<Engine>();
     preparationTempo->setBpm(60);
     preparationTempo->toggleRecord();
-    advance(*preparationTempo, SampleRate * 8 - 1);
-    assert(preparationTempo->status().preparationLoop == 1);
+    advance(*preparationTempo, SampleRate * 2);
+    assert(preparationTempo->status().preparation == RecordPreparation::GetReady);
+    assert(preparationTempo->status().preparationLoop == 0);
+    assert(preparationTempo->status().countdown == 2);
+    preparationTempo->setBpm(180);
+    assert(preparationTempo->status().bpm == 60 && preparationTempo->session.bpm == 180);
+    advance(*preparationTempo, SampleRate * 2 - 1);
+    assert(preparationTempo->status().preparation == RecordPreparation::GetReady);
     assert(preparationTempo->status().countdown == 1);
     advance(*preparationTempo, 1);
-    assert(preparationTempo->status().preparationLoop == 2);
-    assert(preparationTempo->status().countdown == 8);
-    preparationTempo->setBpm(180);
-    advance(*preparationTempo, (SampleRate * 60 * 8 + 179) / 180);
     assert(preparationTempo->status().preparation == RecordPreparation::Practice);
     assert(preparationTempo->status().preparationLoop == 1);
     assert(preparationTempo->status().countdown == 8);
+    advance(*preparationTempo, SampleRate * 16);
+    assert(preparationTempo->status().recording && preparationTempo->status().bpm == 60);
+    preparationTempo->noteOn(0);
+    advance(*preparationTempo, SampleRate);
+    preparationTempo->noteOff();
+    assert(preparationTempo->status().tick == 96);
+    assert(preparationTempo->session.tracks[0].notes[0].duration == 96);
+    for (int action = 0; action < 4; ++action) {
+        auto finished = std::make_unique<Engine>(*preparationTempo);
+        if (action == 0) finished->toggleRecord();
+        else if (action == 1) finished->stop();
+        else if (action == 2) finished->undo();
+        else finished->clearSelected();
+        assert(!finished->status().armed && !finished->status().recording);
+        assert(finished->status().bpm == 180 && finished->session.bpm == 180);
+        if (finished->status().playing) {
+            uint16_t start = finished->status().tick;
+            advance(*finished, SampleRate);
+            assert(finished->status().tick == (start + 288) % LoopTicks);
+        }
+    }
     preparationTempo->stop();
-    assert(!preparationTempo->status().armed);
 
     auto changingTempo = std::make_unique<Engine>();
     changingTempo->setBpm(60);
@@ -585,7 +649,7 @@ int main() {
     advance(*gestures, 32);
     gestures->noteOff();
     gestures->noteOn(3);
-    advance(*gestures, SampleRate / 2);
+    advance(*gestures, SampleRate);
     gestures->noteOff();
     gestures->stop();
     assert(gestures->session.tracks[0].count == 2);
@@ -602,7 +666,7 @@ int main() {
     acrossCountIn->setBpm(120);
     acrossCountIn->toggleRecord();
     acrossCountIn->noteOn(0);
-    advance(*acrossCountIn, SampleRate * 16 + SampleRate / 10);
+    advance(*acrossCountIn, SampleRate * 20 + SampleRate / 5);
     acrossCountIn->noteOff();
     assert(acrossCountIn->session.tracks[0].notes[0].duration == 24);
 
@@ -1239,11 +1303,13 @@ int main() {
     moves->releaseFx();
     assert(!moves->status().effect.active && moves->revision() == untouchedRevision);
     assert(moves->recordFx() == Result::Ok && moves->status().fxArmed);
+    assert(moves->status().bpm == moves->session.bpm);
     assert(moves->toggleRecord() == Result::Busy);
     assert(moves->queueScene(0) == Result::Busy);
     auto beforePracticeMoves = moves->session.fx;
-    advance(*moves, (uint64_t(SampleRate) * 60 * 16 + moves->session.bpm - 1) / moves->session.bpm);
+    advance(*moves, (uint64_t(SampleRate) * 60 * 4 + moves->session.bpm - 1) / moves->session.bpm);
     assert(moves->status().preparation == RecordPreparation::Practice);
+    assert(moves->status().preparationLoop == 1 && moves->status().tick == 0);
     moves->touchFx(20, 85);
     advance(*moves, 512);
     moves->releaseFx();
@@ -1253,6 +1319,7 @@ int main() {
     moves->recordFx();
     waitForRecording(*moves);
     assert(moves->status().fxRecording && !moves->status().fxArmed);
+    assert(moves->status().bpm == moves->session.bpm);
     auto notesBeforeMoves = std::make_unique<Session>(moves->session);
     assert(moves->touchFx(20, 85) == Result::Ok);
     advance(*moves, 4000);

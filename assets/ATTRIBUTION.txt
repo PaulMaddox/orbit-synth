@@ -44,3 +44,9 @@ These changes do not make the recordings proprietary Casio/other keyboard sample
 Electronic presets, demo arrangements and vocal phrases are original ORBIT
 material. Vocal phrases are generated locally with Windows speech synthesis
 using David, Hazel and Zira and expressive SSML; they are not user recordings.
+
+The original startup and automatic-shutdown melodies in tools\power-chimes\
+were rendered with ORBIT's glock preset, using the VSCO 2 Community Edition
+glockenspiel recordings credited above (CC0 1.0). Their approved mono 16 kHz
+PCM16 WAVs are preserved without resynthesis; tools\build_power_chimes.py
+losslessly encodes them for firmware playback.

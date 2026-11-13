@@ -260,6 +260,7 @@ private:
                  int patch = -1, bool preview = false, bool sliced = false);
     void tune(Voice &voice);
     void processTick();
+    uint16_t playbackBpm() const;
     void beginPreparation();
     void cancelPreparation();
     void checkpoint();

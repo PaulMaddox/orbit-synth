@@ -21,12 +21,14 @@
 #include "ui_layout.h"
 #include "touch_gesture.h"
 #include "song_storage.h"
+#include "power_chime.h"
 
 using namespace orbit;
 namespace {
 Arduino_DataBus *bus = new Arduino_HWSPI(3, 5, 1, 2);
 Arduino_GFX *gfx = new Arduino_ST7789(bus, 4, 0, true, 240, 284);
 Engine engine;
+PowerChimePlayer powerChime;
 SemaphoreHandle_t engineMutex;
 TaskHandle_t audioHandle;
 constexpr uint16_t BG = 0x0863, PANEL = 0x10c5, BORDER = 0x2969;
@@ -84,6 +86,10 @@ bool batteryDirty = true;
 uint32_t lastBatteryRead = 0;
 IdlePowerOff idlePower;
 uint32_t powerCountdown = 0;
+bool shutdownChimePending = false;
+uint32_t shutdownChimeStarted = 0, shutdownChimeDrained = 0, shutdownChimeErrors = 0;
+// Six blocks exceed the four-descriptor TX queue, including its current block.
+constexpr uint32_t ChimeDrainMs = 6 * 64 * 1000 / SampleRate;
 int16_t micPeaks[48]{};
 
 struct Lock {
@@ -150,6 +156,8 @@ void switchPage(Page next) {
 }
 
 bool userActivity() {
+    { Lock lock; powerChime.stop(); }
+    shutdownChimePending = false;
     idlePower.activity(millis());
     bool cancelled = powerCountdown != 0;
     if (cancelled) {
@@ -274,9 +282,9 @@ void drawPad(int pad, const Status &s) {
 void preparationText(const Status &s, char *out, size_t capacity) {
     if (s.preparation == RecordPreparation::Waiting)
         snprintf(out, capacity, "PREPARATION STARTS NEXT LOOP");
-    else snprintf(out, capacity, "%s %u - LOOP %u/2",
-        s.preparation == RecordPreparation::GetReady ? "GET READY" : "PRACTICE",
-        s.countdown, s.preparationLoop);
+    else if (s.preparation == RecordPreparation::GetReady)
+        snprintf(out, capacity, "GET READY %u", s.countdown);
+    else snprintf(out, capacity, "PRACTICE %u - LOOP %u/2", s.countdown, s.preparationLoop);
 }
 
 void drawProgress(const Status &s) {
@@ -287,8 +295,8 @@ void drawProgress(const Status &s) {
         snprintf(count, sizeof(count), "%u", s.countdown);
         center(8, 202, 32, count, ready ? AMBER : CYAN, 3);
         text(48, 202, ready ? "GET READY" : "PRACTICE", ready ? AMBER : CYAN, 2);
-        snprintf(detail, sizeof(detail), "LOOP %u/2 - %s", s.preparationLoop,
-            ready ? "LISTEN" : "TRY THE PADS");
+        if (ready) snprintf(detail, sizeof(detail), "LISTEN TO THE BEAT");
+        else snprintf(detail, sizeof(detail), "LOOP %u/2 - TRY THE PADS", s.preparationLoop);
         text(48, 222, detail, DIM);
         return;
     }
@@ -1358,6 +1366,7 @@ void audioTask(void *) {
             Lock lock;
             capturing = engine.status().capturing;
             engine.render(mono, 64);
+            if (powerChime.active()) powerChime.render(mono, 64);
         }
         if (capturing && !wasCapturing) {
             dropStart = board::rxDrops();
@@ -1493,7 +1502,7 @@ bool saveSession(const char *path = "/orbit.bin", const char *temporary = "/orbi
     if (!storageOk) { toast("STORAGE UNAVAILABLE", 4000); return false; }
     // Audio is stopped before flash writes; the audio task only renders silence.
     static Session copy;
-    { Lock lock; if (!engine.idle()) return false; copy = engine.session; }
+    { Lock lock; if (!engine.idle() || powerChime.active()) return false; copy = engine.session; }
     if (!writeSong(LittleFS, path, temporary, copy, engine.sample)) {
         Serial.printf("SAVE_ERROR write/rename path=%s\n", path);
         toast("SAVE FAILED - CHECK STORAGE", 4000);
@@ -1529,7 +1538,8 @@ bool songStorageReady() {
     {
         Lock lock;
         const Status s = engine.status();
-        ready = engine.idle() && !s.armed && !s.fxArmed && !s.fxRecording && !s.fxTouched;
+        ready = engine.idle() && !powerChime.active() &&
+            !s.armed && !s.fxArmed && !s.fxRecording && !s.fxTouched;
     }
     if (!ready || referenceHz.load() || speakerMeterPending.load() || inputProbePending.load()) {
         toast("STOP MUSIC AND WAIT FOR SILENCE", 3000);
@@ -1948,6 +1958,7 @@ void setup() {
         firstRun = true;
     }
     savedRevision = engine.revision();
+    powerChime.start(StartupChime, engine.session.volume);
     if (xTaskCreate(audioTask, "orbit-audio", 6144, nullptr, 4, &audioHandle) != pdPASS) {
         Serial.println("FATAL audio task allocation");
         text(15, 140, "AUDIO TASK ERROR", CORAL);
@@ -1996,15 +2007,16 @@ void loop() {
     if (storageOk && s.revision != savedRevision && !s.playing && !s.capturing &&
         !touchDown && s.livePad < 0 && millis() - lastEdit > 1000) saveSession();
     uint32_t now = millis();
-    bool audioIdle;
-    { Lock lock; audioIdle = engine.idle(); }
+    bool audioIdle, chimeActive;
+    { Lock lock; audioIdle = engine.idle(); chimeActive = powerChime.active(); }
     bool keepAwake = !audioIdle || s.playing || s.recording || s.armed || s.capturing ||
         s.fxRecording || s.fxArmed || s.fxTouched || touchDown || suppressTouch ||
         referenceHz.load() || speakerMeterPending.load() || inputProbePending.load() ||
         (page == Confirm && confirmation == RecordTrack) ||
-        (storageOk && s.revision != savedRevision);
+        (storageOk && s.revision != savedRevision) || (chimeActive && !shutdownChimePending);
+    if (shutdownChimePending && (keepAwake || !onBatteryPower())) userActivity();
     idlePower.update(now, keepAwake, onBatteryPower());
-    uint32_t countdown = idlePower.countdown(now);
+    uint32_t countdown = idlePower.due(now) ? 1 : idlePower.countdown(now);
     if (countdown != powerCountdown) {
         bool full = !powerCountdown || !countdown;
         powerCountdown = countdown;
@@ -2012,8 +2024,24 @@ void loop() {
         else drawPowerCountdown(false);
     }
     if (idlePower.due(now)) {
-        powerOff();
-        return;
+        if (!shutdownChimePending) {
+            { Lock lock; powerChime.start(ShutdownChime, engine.session.volume); }
+            shutdownChimePending = true;
+            shutdownChimeStarted = now;
+            shutdownChimeDrained = 0;
+            shutdownChimeErrors = audioErrors.load();
+        } else if (audioErrors.load() != shutdownChimeErrors || now - shutdownChimeStarted > 1500) {
+            Serial.println("POWER_OFF_ERROR chime playback failed or timed out");
+            userActivity();
+            toast("POWER OFF FAILED - TRY RESTART", 4000);
+        } else if (!chimeActive) {
+            if (!shutdownChimeDrained) shutdownChimeDrained = now;
+            if (now - shutdownChimeDrained >= ChimeDrainMs) {
+                shutdownChimePending = false;
+                powerOff();
+                return;
+            }
+        }
     }
     if (toastText[0] && int32_t(now - toastUntil) >= 0) {
         toastText[0] = 0;

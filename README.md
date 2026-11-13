@@ -8,7 +8,7 @@
 
 ⚡Already got a device? Click here to flash the latest version of ORBIT right from your browser: [Flash ORBIT](https://paulmaddox.github.io/orbit-synth/)
 
-https://github.com/user-attachments/assets/ab3096ea-b3a1-41c6-83c4-612d5da4fe14
+https://github.com/user-attachments/assets/5a181b3e-c020-4660-b8b7-ef50bc0bf94d
 
 *Foundry-animated product preview with ORBIT's firmware-rendered screens and actual audio.*
 

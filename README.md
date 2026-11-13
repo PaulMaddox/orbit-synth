@@ -6,11 +6,12 @@
   <img src="docs/images/device.png" alt="Waveshare ESP32-C6 Touch-LCD-1.83 hardware labels and optional internal lithium battery: 6 x 25 x 25 mm, 3.7 V, 400 mAh" width="700">
 </a>
 
+
 ⚡Already got a device? Click here to flash the latest version of ORBIT right from your browser: [Flash ORBIT](https://paulmaddox.github.io/orbit-synth/)
 
-https://github.com/user-attachments/assets/daa5cbbe-3cd9-457f-80df-426922a01c08
+## See it in action!
 
-*Foundry-animated product preview with ORBIT's firmware-rendered screens and actual audio.*
+https://github.com/user-attachments/assets/daa5cbbe-3cd9-457f-80df-426922a01c08
 
 Make a beat, add a bassline, play an instrument, and turn your voice into music.
 ORBIT is a standalone, beginner-friendly instrument: no computer, account, network,
